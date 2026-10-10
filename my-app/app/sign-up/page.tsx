@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { AuthIntro } from "@/components/auth/auth-intro";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Brand, CreatorBadge } from "@/components/auth/brand";
+import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 import { SignUpAside } from "@/components/auth/sign-up-aside";
 import {
   Button,
@@ -37,9 +38,7 @@ export default function SignUpPage() {
       </AuthIntro>
 
       <div className="mt-6 grid grid-cols-2 gap-3">
-        <Button variant="secondary" fullWidth leadingIcon={<Icon name="google" />}>
-          Google
-        </Button>
+        <GoogleAuthButton>Google</GoogleAuthButton>
         <Button variant="secondary" fullWidth leadingIcon={<Icon name="youtube" />}>
           YouTube ID
         </Button>

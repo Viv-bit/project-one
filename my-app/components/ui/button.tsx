@@ -57,6 +57,14 @@ export function Button({
   );
 
   if (href) {
+    if (href.startsWith("http://") || href.startsWith("https://")) {
+      return (
+        <a href={href} data-slot="button" data-variant={variant} className={classes}>
+          {content}
+        </a>
+      );
+    }
+
     return (
       <Link href={href} data-slot="button" data-variant={variant} className={classes}>
         {content}

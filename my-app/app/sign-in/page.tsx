@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { AuthError } from "@/components/auth/auth-error";
 import { AuthIntro } from "@/components/auth/auth-intro";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Brand } from "@/components/auth/brand";
+import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 import { SignInAside } from "@/components/auth/sign-in-aside";
 import {
   Badge,
@@ -20,7 +22,14 @@ export const metadata: Metadata = {
     "Sign in to the Lumen Creator Intelligence Dashboard for hook diagnostics and content experiments.",
 };
 
-export default function SignInPage() {
+type SignInPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function SignInPage({ searchParams }: SignInPageProps) {
+  const params = await searchParams;
+  const error = Array.isArray(params.error) ? params.error[0] : params.error;
+
   return (
     <AuthShell aside={<SignInAside />} asideLayout="fill">
       <div className="flex items-center justify-between gap-3">
@@ -41,13 +50,12 @@ export default function SignInPage() {
       </AuthIntro>
 
       <div className="mt-6 grid grid-cols-2 gap-3">
-        <Button variant="secondary" fullWidth leadingIcon={<Icon name="google" />}>
-          Google SSO
-        </Button>
+        <GoogleAuthButton>Google SSO</GoogleAuthButton>
         <Button variant="secondary" fullWidth leadingIcon={<Icon name="youtube" />}>
           YouTube Verified
         </Button>
       </div>
+      <AuthError error={error} />
 
       <Divider className="my-5">Or continue with email</Divider>
 
