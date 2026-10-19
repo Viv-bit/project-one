@@ -9,5 +9,5 @@ export default async function AuthLoginPage({ searchParams }: AuthLoginPageProps
   const error = Array.isArray(params.error) ? params.error[0] : params.error;
   const query = error ? `?error=${encodeURIComponent(error)}` : "";
 
-  redirect(`/sign-in${query}`);
+  redirect(`/${query}`);
 }

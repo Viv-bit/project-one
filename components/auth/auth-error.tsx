@@ -1,5 +1,7 @@
 const messages: Record<string, string> = {
   google: "Google sign-in could not be completed. Try again.",
+  youtube:
+    "YouTube connection could not be completed. The authorization was cancelled or failed. Please try again.",
 };
 
 export function AuthError({ error }: { error?: string }) {

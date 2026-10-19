@@ -4,6 +4,7 @@ import { AuthIntro } from "@/components/auth/auth-intro";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Brand } from "@/components/auth/brand";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
+import { YouTubeSignInButton } from "@/components/youtube/youtube-sign-in-button";
 import { SignInAside } from "@/components/auth/sign-in-aside";
 import {
   Badge,
@@ -51,9 +52,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
 
       <div className="mt-6 grid grid-cols-2 gap-3">
         <GoogleAuthButton>Google SSO</GoogleAuthButton>
-        <Button variant="secondary" fullWidth leadingIcon={<Icon name="youtube" />}>
-          YouTube Verified
-        </Button>
+        <YouTubeSignInButton label="YouTube Verified" />
       </div>
       <AuthError error={error} />
 
@@ -76,7 +75,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
           autoComplete="current-password"
           placeholder="••••••••••••"
           hint={
-            <TextLink href="/sign-in" className="text-xs font-medium">
+            <TextLink href="/" className="text-xs font-medium">
               Forgot password?
             </TextLink>
           }

@@ -3,6 +3,7 @@ import { AuthIntro } from "@/components/auth/auth-intro";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Brand, CreatorBadge } from "@/components/auth/brand";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
+import { YouTubeSignInButton } from "@/components/youtube/youtube-sign-in-button";
 import { SignUpAside } from "@/components/auth/sign-up-aside";
 import {
   Button,
@@ -39,9 +40,7 @@ export default function SignUpPage() {
 
       <div className="mt-6 grid grid-cols-2 gap-3">
         <GoogleAuthButton>Google</GoogleAuthButton>
-        <Button variant="secondary" fullWidth leadingIcon={<Icon name="youtube" />}>
-          YouTube ID
-        </Button>
+        <YouTubeSignInButton label="YouTube ID" />
       </div>
 
       <Divider className="my-5">Or register with creator email</Divider>
@@ -104,7 +103,7 @@ export default function SignUpPage() {
       </Form>
 
       <p className="mt-4 text-center text-sm text-muted">
-        Already have a Lumen account? <TextLink href="/sign-in">Sign in</TextLink>
+        Already have a Lumen account? <TextLink href="/">Sign in</TextLink>
       </p>
     </AuthShell>
   );

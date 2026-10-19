@@ -15,6 +15,16 @@ export const iconNames = [
   "ban",
   "zap",
   "activity",
+  "refresh",
+  "external-link",
+  "copy",
+  "trash",
+  "info",
+  "alert-triangle",
+  "x",
+  "users",
+  "video",
+  "check-circle",
 ] as const;
 
 export type IconName = (typeof iconNames)[number];
@@ -136,6 +146,68 @@ const icons: Record<IconName, React.ReactNode> = {
   zap: <path {...stroke} d="M13 3 5.8 13.2H12L11 21l7.2-10.2H12L13 3Z" />,
   activity: (
     <path {...stroke} d="M3 12h4l2.2-5.2L12.8 17 15 12h6" />
+  ),
+  refresh: (
+    <path
+      {...stroke}
+      d="M21 12a9 9 0 0 1-15.5 6.36L3 16m0-4a9 9 0 0 1 15.5-6.36L21 8M21 3v5h-5M3 21v-5h5"
+    />
+  ),
+  "external-link": (
+    <>
+      <path {...stroke} d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      <path {...stroke} d="M15 3h6v6M10 14 21 3" />
+    </>
+  ),
+  copy: (
+    <>
+      <rect {...stroke} x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path {...stroke} d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </>
+  ),
+  trash: (
+    <>
+      <path {...stroke} d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <line {...stroke} x1="10" y1="11" x2="10" y2="17" />
+      <line {...stroke} x1="14" y1="11" x2="14" y2="17" />
+    </>
+  ),
+  info: (
+    <>
+      <circle {...stroke} cx="12" cy="12" r="9" />
+      <line {...stroke} x1="12" y1="16" x2="12" y2="12" />
+      <circle fill="currentColor" cx="12" cy="8" r="1" />
+    </>
+  ),
+  "alert-triangle": (
+    <>
+      <path
+        {...stroke}
+        d="m10.29 3.86-8.82 15.3c-.77 1.34.19 3.02 1.73 3.02h17.6c1.54 0 2.5-1.68 1.73-3.02l-8.82-15.3a2 2 0 0 0-3.42 0z"
+      />
+      <line {...stroke} x1="12" y1="9" x2="12" y2="13" />
+      <circle fill="currentColor" cx="12" cy="17" r="1" />
+    </>
+  ),
+  x: <path {...stroke} d="M18 6 6 18M6 6l12 12" />,
+  users: (
+    <>
+      <path {...stroke} d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle {...stroke} cx="9" cy="7" r="4" />
+      <path {...stroke} d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+    </>
+  ),
+  video: (
+    <>
+      <polygon {...stroke} points="23 7 16 12 23 17 23 7" />
+      <rect {...stroke} x="1" y="5" width="15" height="14" rx="2" ry="2" />
+    </>
+  ),
+  "check-circle": (
+    <>
+      <circle {...stroke} cx="12" cy="12" r="9" />
+      <path {...stroke} d="m9 12 2 2 4-4" />
+    </>
   ),
 };
 

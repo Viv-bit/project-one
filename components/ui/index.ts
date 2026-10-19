@@ -10,3 +10,4 @@ export { Icon, iconNames, type IconName } from "@/components/ui/icon";
 export { MediaFrame } from "@/components/ui/media-frame";
 export { TextField, type TextFieldProps } from "@/components/ui/text-field";
 export { TextLink } from "@/components/ui/text-link";
+export { Modal } from "@/components/ui/modal";
