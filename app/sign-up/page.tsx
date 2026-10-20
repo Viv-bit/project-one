@@ -4,14 +4,10 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { Brand, CreatorBadge } from "@/components/auth/brand";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 import { YouTubeSignInButton } from "@/components/youtube/youtube-sign-in-button";
+import { SignUpForm } from "@/components/auth/sign-up-form";
 import { SignUpAside } from "@/components/auth/sign-up-aside";
 import {
-  Button,
-  Checkbox,
   Divider,
-  Form,
-  Icon,
-  TextField,
   TextLink,
 } from "@/components/ui";
 
@@ -45,62 +41,7 @@ export default function SignUpPage() {
 
       <Divider className="my-5">Or register with creator email</Divider>
 
-      <Form className="flex flex-col gap-3.5">
-        <TextField
-          label="Full Name"
-          name="name"
-          autoComplete="name"
-          placeholder="e.g. Alex Rivers"
-          required
-        />
-        <TextField
-          label="Work or Creator Email"
-          name="email"
-          type="email"
-          autoComplete="email"
-          placeholder="alex@creativeflow.studio"
-          required
-        />
-        <TextField
-          label="Password"
-          name="password"
-          autoComplete="new-password"
-          placeholder="Create secure password"
-          hint="8+ characters + 1 number"
-          revealable
-          minLength={8}
-          required
-        />
-        <TextField
-          label="Creator Channel URL or Primary Handle"
-          name="channel"
-          autoComplete="url"
-          placeholder="youtube.com/@alexrivers or alexcreats"
-          hint="Optional"
-          leading={<Icon name="youtube" className="size-4" />}
-        />
-        <Checkbox
-          name="terms"
-          required
-          className="mt-1"
-          label={
-            <>
-              I agree to Lumen&apos;s <TextLink href="/sign-up">Terms of Service</TextLink> and{" "}
-              <TextLink href="/sign-up">Privacy Policy</TextLink>. Lumen requests strictly
-              100% read-only platform permissions.
-            </>
-          }
-        />
-        <Button
-          type="submit"
-          fullWidth
-          size="lg"
-          className="mt-1"
-          trailingIcon={<Icon name="arrow-right" />}
-        >
-          Create Free Account
-        </Button>
-      </Form>
+      <SignUpForm />
 
       <p className="mt-4 text-center text-sm text-muted">
         Already have a Lumen account? <TextLink href="/">Sign in</TextLink>

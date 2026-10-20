@@ -1,8 +1,6 @@
 import {
   apiUrl,
-  youtubeConnectUrl,
   youtubeConnectionUrl,
-  type YouTubeChannel,
   type YouTubeConnectionState,
 } from "./api";
 

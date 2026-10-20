@@ -19,28 +19,16 @@ export function YouTubeConnectionManager({
   const [connectionState, setConnectionState] =
     useState<YouTubeConnectionState | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(() => {
+    if (initialError === "youtube") {
+      return "YouTube account connection was not completed. Google consent was cancelled or an error occurred during authorization.";
+    }
+    if (initialError) {
+      return `Connection notice: ${initialError}. Please try connecting again.`;
+    }
+    return null;
+  });
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  // Check URL params for error
-  useEffect(() => {
-    // Check initial prop or window.location.search
-    let errorParam = initialError;
-    if (!errorParam && typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      errorParam = params.get("error") ?? undefined;
-    }
-
-    if (errorParam === "youtube") {
-      setErrorMessage(
-        "YouTube account connection was not completed. Google consent was cancelled or an error occurred during authorization.",
-      );
-    } else if (errorParam) {
-      setErrorMessage(
-        `Connection notice: ${errorParam}. Please try connecting again.`,
-      );
-    }
-  }, [initialError]);
 
   const loadConnection = useCallback(async () => {
     try {
@@ -63,8 +51,37 @@ export function YouTubeConnectionManager({
   }, []);
 
   useEffect(() => {
-    loadConnection();
-  }, [loadConnection]);
+    let ignore = false;
+
+    async function initialFetch() {
+      try {
+        const data = await getYouTubeConnection();
+        if (!ignore) {
+          setConnectionState(data);
+        }
+      } catch (err: unknown) {
+        if (!ignore) {
+          console.error("Failed to fetch YouTube connection status:", err);
+          if (err instanceof Error && err.message === "UNAUTHORIZED") {
+            setErrorMessage(
+              "Your creator session could not be verified. Please ensure you are logged in.",
+            );
+          }
+          setConnectionState({ connected: false });
+        }
+      } finally {
+        if (!ignore) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void initialFetch();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   const handleDisconnected = () => {
     setConnectionState({ connected: false });

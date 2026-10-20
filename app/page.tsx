@@ -5,15 +5,12 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { Brand } from "@/components/auth/brand";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 import { YouTubeSignInButton } from "@/components/youtube/youtube-sign-in-button";
+import { SignInForm } from "@/components/auth/sign-in-form";
 import { SignInAside } from "@/components/auth/sign-in-aside";
 import {
   Badge,
-  Button,
-  Checkbox,
   Divider,
-  Form,
   Icon,
-  TextField,
   TextLink,
 } from "@/components/ui";
 
@@ -58,42 +55,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
 
       <Divider className="my-5">Or continue with email</Divider>
 
-      <Form className="flex flex-col gap-3.5">
-        <TextField
-          label="Creator Email"
-          name="email"
-          type="email"
-          autoComplete="email"
-          placeholder="alex@creativeflow.studio"
-          hint="Verified ID"
-          leading={<Icon name="at" />}
-          required
-        />
-        <TextField
-          label="Password"
-          name="password"
-          autoComplete="current-password"
-          placeholder="••••••••••••"
-          hint={
-            <TextLink href="/" className="text-xs font-medium">
-              Forgot password?
-            </TextLink>
-          }
-          leading={<Icon name="lock" />}
-          revealable
-          required
-        />
-        <Checkbox name="remember" label="Remember this device for 30 days" />
-        <Button
-          type="submit"
-          fullWidth
-          size="lg"
-          className="mt-1"
-          trailingIcon={<Icon name="arrow-right" />}
-        >
-          Sign In to Dashboard
-        </Button>
-      </Form>
+      <SignInForm />
 
       <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs text-muted">
         <Icon name="shield" className="size-3.5 text-brand" />

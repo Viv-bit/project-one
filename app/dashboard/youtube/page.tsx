@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Brand, CreatorBadge } from "@/components/auth/brand";
 import { YouTubeConnectionManager } from "@/components/youtube/youtube-connection-manager";
-import { Badge, Chip, Icon } from "@/components/ui";
+import { Chip, Icon } from "@/components/ui";
 
 export const metadata: Metadata = {
   title: "YouTube Channel Settings",
