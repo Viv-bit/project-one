@@ -25,6 +25,34 @@ export const iconNames = [
   "users",
   "video",
   "check-circle",
+  "layout-dashboard",
+  "brain",
+  "layers",
+  "folder-tree",
+  "map",
+  "flask",
+  "link",
+  "refresh-cw",
+  "settings",
+  "search",
+  "help-circle",
+  "bell",
+  "chevron-down",
+  "chevron-up",
+  "chevron-right",
+  "chevrons-up-down",
+  "thumbs-up",
+  "arrow-up",
+  "download",
+  "clock",
+  "calendar",
+  "git-commit",
+  "trending-up",
+  "trending-down",
+  "play",
+  "message-square",
+  "filter",
+  "plus",
 ] as const;
 
 export type IconName = (typeof iconNames)[number];
@@ -209,6 +237,151 @@ const icons: Record<IconName, React.ReactNode> = {
       <path {...stroke} d="m9 12 2 2 4-4" />
     </>
   ),
+  "layout-dashboard": (
+    <>
+      <rect {...stroke} x="3" y="3" width="7" height="9" rx="1" />
+      <rect {...stroke} x="14" y="3" width="7" height="5" rx="1" />
+      <rect {...stroke} x="14" y="12" width="7" height="9" rx="1" />
+      <rect {...stroke} x="3" y="16" width="7" height="5" rx="1" />
+    </>
+  ),
+  brain: (
+    <>
+      <path {...stroke} d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" />
+      <path {...stroke} d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z" />
+      <path {...stroke} d="M12 5v14" />
+    </>
+  ),
+  layers: (
+    <>
+      <path {...stroke} d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" />
+      <path {...stroke} d="m22 12.5-9.17 4.16a2 2 0 0 1-1.66 0L2 12.5" />
+      <path {...stroke} d="m22 17.5-9.17 4.16a2 2 0 0 1-1.66 0L2 17.5" />
+    </>
+  ),
+  "folder-tree": (
+    <>
+      <path {...stroke} d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z" />
+      <path {...stroke} d="M3 13v-1a2 2 0 0 1 2-2h7" />
+      <path {...stroke} d="M5 10v11a1 1 0 0 0 1 1h2" />
+      <rect {...stroke} x="8" y="14" width="6" height="5" rx="1" />
+      <rect {...stroke} x="16" y="14" width="6" height="5" rx="1" />
+    </>
+  ),
+  map: (
+    <>
+      <path {...stroke} d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z" />
+      <path {...stroke} d="M15 5.764v15" />
+      <path {...stroke} d="M9 3.236v15" />
+    </>
+  ),
+  flask: (
+    <>
+      <path {...stroke} d="M10 2v7.31L4.42 19.35A2 2 0 0 0 6.16 22h11.68a2 2 0 0 0 1.74-2.65L14 9.31V2" />
+      <path {...stroke} d="M8.5 2h7" />
+      <path {...stroke} d="M7 16h10" />
+    </>
+  ),
+  link: (
+    <>
+      <path {...stroke} d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path {...stroke} d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </>
+  ),
+  "refresh-cw": (
+    <path
+      {...stroke}
+      d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 3v5h-5M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M3 21v-5h5"
+    />
+  ),
+  settings: (
+    <>
+      <circle {...stroke} cx="12" cy="12" r="3" />
+      <path
+        {...stroke}
+        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+      />
+    </>
+  ),
+  search: (
+    <>
+      <circle {...stroke} cx="11" cy="11" r="8" />
+      <path {...stroke} d="m21 21-4.35-4.35" />
+    </>
+  ),
+  "help-circle": (
+    <>
+      <circle {...stroke} cx="12" cy="12" r="10" />
+      <path {...stroke} d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+      <circle fill="currentColor" cx="12" cy="17" r="1" />
+    </>
+  ),
+  bell: (
+    <>
+      <path {...stroke} d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+      <path {...stroke} d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+    </>
+  ),
+  "chevron-down": <path {...stroke} d="m6 9 6 6 6-6" />,
+  "chevron-up": <path {...stroke} d="m18 15-6-6-6 6" />,
+  "chevron-right": <path {...stroke} d="m9 18 6-6-6-6" />,
+  "chevrons-up-down": <path {...stroke} d="m7 15 5 5 5-5M7 9l5-5 5 5" />,
+  "thumbs-up": (
+    <path
+      {...stroke}
+      d="M7 10v12M15 10.5V6.4a2.4 2.4 0 0 0-2.4-2.4l-3.2 6H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3z"
+    />
+  ),
+  "arrow-up": <path {...stroke} d="m5 12 7-7 7 7M12 19V5" />,
+  download: (
+    <>
+      <path {...stroke} d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline {...stroke} points="7 10 12 15 17 10" />
+      <line {...stroke} x1="12" y1="15" x2="12" y2="3" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle {...stroke} cx="12" cy="12" r="10" />
+      <polyline {...stroke} points="12 6 12 12 16 14" />
+    </>
+  ),
+  calendar: (
+    <>
+      <rect {...stroke} x="3" y="4" width="18" height="18" rx="2" ry="2" />
+      <line {...stroke} x1="16" y1="2" x2="16" y2="6" />
+      <line {...stroke} x1="8" y1="2" x2="8" y2="6" />
+      <line {...stroke} x1="3" y1="10" x2="21" y2="10" />
+    </>
+  ),
+  "git-commit": (
+    <>
+      <circle {...stroke} cx="12" cy="12" r="3" />
+      <line {...stroke} x1="3" y1="12" x2="9" y2="12" />
+      <line {...stroke} x1="15" y1="12" x2="21" y2="12" />
+    </>
+  ),
+  "trending-up": (
+    <>
+      <polyline {...stroke} points="23 6 13.5 15.5 8.5 10.5 1 18" />
+      <polyline {...stroke} points="17 6 23 6 23 12" />
+    </>
+  ),
+  "trending-down": (
+    <>
+      <polyline {...stroke} points="23 18 13.5 8.5 8.5 13.5 1 6" />
+      <polyline {...stroke} points="17 18 23 18 23 12" />
+    </>
+  ),
+  play: <polygon {...stroke} points="5 3 19 12 5 21 5 3" fill="currentColor" fillOpacity="0.1" />,
+  "message-square": (
+    <path
+      {...stroke}
+      d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+    />
+  ),
+  filter: <polygon {...stroke} points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />,
+  plus: <path {...stroke} d="M5 12h14M12 5v14" />,
 };
 
 export function Icon({ name, className, title }: IconProps) {
