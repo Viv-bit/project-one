@@ -114,7 +114,7 @@ export type CreatorVoiceVoteItem = {
 export type ShippingCommitItem = {
   id: string;
   version: string;
-  relativeTime: string;
+  relativeTime?: string;
   commitHash: string;
   description: string;
   highlightTag: string;

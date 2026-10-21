@@ -18,36 +18,7 @@ export default async function YouTubePage({ searchParams }: YouTubePageProps) {
   const error = Array.isArray(params.error) ? params.error[0] : params.error;
 
   return (
-    <div className="min-h-screen bg-[#f3f0f8] text-ink">
-      {/* Top Navigation */}
-      <header className="sticky top-0 z-40 border-b border-frame/70 bg-cream/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3.5 sm:px-6">
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="transition-opacity hover:opacity-90">
-              <Brand badge={<CreatorBadge />} />
-            </Link>
-          </div>
-
-          <nav className="flex items-center gap-2 text-sm font-medium text-muted">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 hover:bg-black/5 hover:text-ink transition-colors"
-            >
-              <Icon name="arrow-right" className="size-3.5 rotate-180" />
-              Back to Dashboard
-            </Link>
-          </nav>
-
-          <div className="flex items-center gap-2.5">
-            <Chip variant="outline" className="hidden sm:inline-flex" icon={<Icon name="shield" className="size-3 text-brand" />}>
-              Session Active
-            </Chip>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
+    <div className="max-w-5xl space-y-8 pb-16">
         <div className="mb-8">
           <div className="flex items-center gap-2 text-xs font-medium text-muted">
             <Link href="/dashboard" className="hover:text-ink">
@@ -122,7 +93,6 @@ export default async function YouTubePage({ searchParams }: YouTubePageProps) {
             </div>
           </div>
         </div>
-      </main>
     </div>
   );
 }

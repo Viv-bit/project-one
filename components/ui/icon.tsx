@@ -53,6 +53,8 @@ export const iconNames = [
   "message-square",
   "filter",
   "plus",
+  "trophy",
+  "megaphone",
 ] as const;
 
 export type IconName = (typeof iconNames)[number];
@@ -382,6 +384,21 @@ const icons: Record<IconName, React.ReactNode> = {
   ),
   filter: <polygon {...stroke} points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />,
   plus: <path {...stroke} d="M5 12h14M12 5v14" />,
+  trophy: (
+    <>
+      <path {...stroke} d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+      <path {...stroke} d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+      <path {...stroke} d="M4 22h16" />
+      <path {...stroke} d="M10 14.66V17c0 .55-.45 1-1 1H8c-.55 0-1 .45-1 1v1c0 .55.45 1 1 1h8c.55 0 1-.45 1-1v-1c0-.55-.45-1-1-1h-1c-.55 0-1-.45-1-1v-2.34" />
+      <path {...stroke} d="M6 4h12v6a6 6 0 0 1-12 0V4Z" />
+    </>
+  ),
+  megaphone: (
+    <>
+      <path {...stroke} d="m3 11 18-5v12L3 14v-3z" />
+      <path {...stroke} d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
+    </>
+  ),
 };
 
 export function Icon({ name, className, title }: IconProps) {

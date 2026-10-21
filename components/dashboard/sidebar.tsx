@@ -50,8 +50,8 @@ const NAVIGATION_GROUPS: NavGroup[] = [
     title: "STRATEGY & PLANNING",
     items: [
       {
-        label: "Product Roadmap",
-        href: "/dashboard/roadmap",
+        label: "Growth Plan",
+        href: "/dashboard/growth-plan",
         icon: "map",
       },
       {
@@ -89,6 +89,9 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
   function isItemActive(item: NavItem): boolean {
     if (item.exact) {
       return pathname === item.href;
+    }
+    if (item.href === "/dashboard/growth-plan") {
+      return pathname === "/dashboard/growth-plan" || pathname === "/dashboard/roadmap";
     }
     return pathname.startsWith(item.href) && item.href !== "/dashboard";
   }

@@ -75,11 +75,11 @@ export function Topbar({ onOpenMobileMenu }: TopbarProps) {
                     <strong className="text-ink">Deterministic Framework:</strong> Rigorous regression testing on your past 50 video uploads.
                   </p>
                   <Link
-                    href="/dashboard/roadmap"
+                    href="/dashboard/growth-plan"
                     onClick={() => setIsGuideOpen(false)}
                     className="inline-flex items-center gap-1 text-brand font-semibold hover:underline"
                   >
-                    View Model Roadmap &rarr;
+                    View Growth Plan &rarr;
                   </Link>
                 </div>
               </div>

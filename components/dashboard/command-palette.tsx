@@ -23,10 +23,10 @@ const COMMANDS: CommandItem[] = [
   },
   {
     id: "nav-roadmap",
-    title: "Product Roadmap & Engineering Vision",
+    title: "Growth Plan (Personalized Creator Roadmap)",
     category: "Navigation",
-    href: "/dashboard/roadmap",
-    description: "Audit public feature pipeline and vote on research priorities",
+    href: "/dashboard/growth-plan",
+    description: "Sequenced 90-day sprints, algorithmic levers, and prescribed video experiments",
   },
   {
     id: "nav-youtube",
