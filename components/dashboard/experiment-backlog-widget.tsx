@@ -5,6 +5,8 @@ import { Icon } from "@/components/ui";
 import { EXPERIMENT_HYPOTHESES } from "@/lib/data/intelligence-mock-data";
 import type { ExperimentHypothesis } from "@/lib/types/creator-intelligence";
 
+import Link from "next/link";
+
 export function ExperimentBacklogWidget() {
   const [hypotheses, setHypotheses] = useState<ExperimentHypothesis[]>(EXPERIMENT_HYPOTHESES);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -41,9 +43,12 @@ export function ExperimentBacklogWidget() {
             </span>
             <h2 className="text-base font-semibold text-ink">Experiment Backlog</h2>
           </div>
-          <span className="rounded-full bg-[#f6f2ea] border border-[#e8e2d8] px-2 py-0.5 text-[10px] font-semibold text-[#6e655a]">
-            {hypotheses.length} Active Tests
-          </span>
+          <Link
+            href="/dashboard/experiments"
+            className="rounded-full bg-[#f6f2ea] border border-[#e8e2d8] px-2 py-0.5 text-[10px] font-semibold text-brand hover:underline"
+          >
+            {hypotheses.length} Active Tests &rarr;
+          </Link>
         </div>
 
         {/* Hypotheses List */}

@@ -30,24 +30,27 @@ const NAVIGATION_GROUPS: NavGroup[] = [
         exact: true,
       },
       {
-        label: "AI Classification",
-        href: "/dashboard?view=classification",
-        icon: "brain",
-      },
-      {
-        label: "Content Pipeline",
-        href: "/dashboard?view=pipeline",
+        label: "Content Explorer",
+        href: "/dashboard/content",
         icon: "layers",
+        badge: "16 Posts",
       },
       {
-        label: "Taxonomy Explorer",
-        href: "/dashboard?view=taxonomy",
-        icon: "folder-tree",
+        label: "Peer Benchmarks",
+        href: "/dashboard/benchmarks",
+        icon: "users",
+        badge: "18 Peers",
+      },
+      {
+        label: "Evidence & Insights",
+        href: "/dashboard/insights",
+        icon: "brain",
+        badge: "3 Actions",
       },
     ],
   },
   {
-    title: "STRATEGY & PLANNING",
+    title: "STRATEGY & EXPERIMENTS",
     items: [
       {
         label: "Growth Plan",
@@ -56,8 +59,9 @@ const NAVIGATION_GROUPS: NavGroup[] = [
       },
       {
         label: "Experiment Backlog",
-        href: "/dashboard?view=experiments",
+        href: "/dashboard/experiments",
         icon: "flask",
+        badge: "2 Active",
       },
     ],
   },
@@ -65,14 +69,15 @@ const NAVIGATION_GROUPS: NavGroup[] = [
     title: "INTEGRATIONS",
     items: [
       {
-        label: "Channel Connect",
+        label: "YouTube Channel",
         href: "/dashboard/youtube",
         icon: "link",
       },
       {
-        label: "Sync Status",
-        href: "/dashboard?view=sync",
+        label: "Ingestion Pipeline",
+        href: "/onboarding",
         icon: "refresh-cw",
+        badge: "Live",
       },
     ],
   },

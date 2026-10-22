@@ -1,5 +1,4 @@
-"use client";
-
+import Link from "next/link";
 import { Icon } from "@/components/ui";
 import { COHORT_BENCHMARKS } from "@/lib/data/intelligence-mock-data";
 
@@ -14,13 +13,16 @@ export function CohortBenchmarkingWidget() {
           </span>
           <h2 className="text-base font-semibold text-ink">Cohort Benchmarking</h2>
         </div>
-        <span className="rounded-full bg-[#f6f2ea] border border-[#e8e2d8] px-2 py-0.5 text-[10px] font-semibold text-[#6e655a]">
-          Tech &amp; Craft
-        </span>
+        <Link
+          href="/dashboard/benchmarks"
+          className="rounded-full bg-[#f6f2ea] border border-[#e8e2d8] px-2 py-0.5 text-[10px] font-semibold text-brand hover:underline"
+        >
+          18 Peers &rarr;
+        </Link>
       </div>
 
       <p className="mt-2.5 text-xs text-[#786f65] leading-relaxed">
-        Compared directly against 40 active verified creators in your 200k–600k subscriber tier.
+        Compared directly against 18 active verified creators in your 250k–500k subscriber tier.
       </p>
 
       {/* Benchmark Rows */}

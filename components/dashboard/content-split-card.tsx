@@ -1,5 +1,4 @@
-"use client";
-
+import Link from "next/link";
 import { Icon } from "@/components/ui";
 import { CONTENT_SPLIT_ITEMS } from "@/lib/data/intelligence-mock-data";
 
@@ -13,13 +12,16 @@ export function ContentSplitCard() {
             Top vs Underperforming Content Split
           </h2>
           <p className="text-xs text-[#82786e]">
-            Direct comparative taxonomy analysis of recent 50 uploads
+            Direct comparative taxonomy analysis of recent 16 uploads
           </p>
         </div>
-        <button className="inline-flex items-center gap-1 text-xs font-semibold text-brand transition-colors hover:text-brand-strong">
-          <span>View full split</span>
+        <Link
+          href="/dashboard/content"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-brand transition-colors hover:text-brand-strong"
+        >
+          <span>View all 16 posts</span>
           <Icon name="arrow-right" className="size-3" />
-        </button>
+        </Link>
       </div>
 
       {/* Side-by-side Video Cards Grid */}

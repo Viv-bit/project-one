@@ -5,8 +5,12 @@ import { Icon } from "@/components/ui";
 import { EVIDENCE_OPPORTUNITIES } from "@/lib/data/intelligence-mock-data";
 import type { EvidenceOpportunity } from "@/lib/types/creator-intelligence";
 
+import Link from "next/link";
+import { CreateExperimentModal } from "@/components/dashboard/create-experiment-modal";
+
 export function EvidenceOpportunitiesCard() {
   const [activeModalItem, setActiveModalItem] = useState<EvidenceOpportunity | null>(null);
+  const [isExperimentModalOpen, setIsExperimentModalOpen] = useState(false);
 
   return (
     <>
@@ -21,9 +25,12 @@ export function EvidenceOpportunitiesCard() {
               Top 3 Evidence-Backed Opportunities
             </h2>
           </div>
-          <span className="rounded-full bg-[#f6f2ea] border border-[#e8e2d8] px-2.5 py-1 text-[11px] font-semibold text-[#6e655a]">
-            FRD Deterministic Engine
-          </span>
+          <Link
+            href="/dashboard/insights"
+            className="rounded-full bg-[#f6f2ea] border border-[#e8e2d8] px-2.5 py-1 text-[11px] font-semibold text-brand hover:underline"
+          >
+            View All Evidence &rarr;
+          </Link>
         </div>
 
         {/* 3 Opportunities List */}
@@ -109,21 +116,37 @@ export function EvidenceOpportunitiesCard() {
                 </p>
               </div>
               <div className="rounded-xl border border-line bg-cream/60 p-3 text-[11px] text-muted">
-                Confidence Score: <strong>94.2%</strong> · Tested against 50 historical uploads in Tech &amp; Studio Craft cohort.
+                Confidence Score: <strong>94.2%</strong> · Calibrated against 16 historical uploads in Tech &amp; Studio Craft cohort.
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end">
+            <div className="mt-6 flex items-center justify-end gap-2.5">
               <button
                 onClick={() => setActiveModalItem(null)}
-                className="rounded-xl bg-ink px-4 py-2 text-xs font-semibold text-white shadow hover:bg-ink/90"
+                className="rounded-xl border border-[#ded6c7] px-3.5 py-2 text-xs font-semibold text-muted hover:bg-cream"
               >
-                Done
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setActiveModalItem(null);
+                  setIsExperimentModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white shadow hover:bg-brand-strong"
+              >
+                <Icon name="flask" className="size-3.5" />
+                <span>Turn into Experiment</span>
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Experiment Modal */}
+      <CreateExperimentModal
+        isOpen={isExperimentModalOpen}
+        onClose={() => setIsExperimentModalOpen(false)}
+      />
     </>
   );
 }

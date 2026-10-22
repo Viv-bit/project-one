@@ -6,7 +6,7 @@ import { Icon } from "@/components/ui";
 export function ExperimentPendingCard() {
   return (
     <Link
-      href="/dashboard/growth-plan"
+      href="/dashboard/experiments"
       className="group flex items-center justify-between rounded-2xl border border-[#e6e0d6] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] transition-all hover:border-brand/50 hover:bg-[#faf7f3]"
     >
       <div className="flex items-center gap-3">

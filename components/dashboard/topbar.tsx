@@ -14,6 +14,8 @@ export function Topbar({ onOpenMobileMenu }: TopbarProps) {
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+
   return (
     <>
       <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-[#e6e0d6] bg-[#faf7f2]/90 px-4 sm:px-6 backdrop-blur-md">
@@ -72,7 +74,7 @@ export function Topbar({ onOpenMobileMenu }: TopbarProps) {
                     <strong className="text-ink">0-3s Hook Hold Rate:</strong> Measures audience retention during critical thesis delivery.
                   </p>
                   <p>
-                    <strong className="text-ink">Deterministic Framework:</strong> Rigorous regression testing on your past 50 video uploads.
+                    <strong className="text-ink">Deterministic Framework:</strong> Rigorous regression testing on your past 16 video uploads.
                   </p>
                   <Link
                     href="/dashboard/growth-plan"
@@ -112,16 +114,16 @@ export function Topbar({ onOpenMobileMenu }: TopbarProps) {
                       <span className="text-[10px] text-muted font-normal">12m ago</span>
                     </div>
                     <p className="mt-0.5 text-muted">
-                      Uploaded &ldquo;The $2,000 Minimalist Desk&rdquo; processed with 82.4% hook hold rate.
+                      16 recent uploads processed. Batch 1 calibrated with 74.2% median hook hold rate.
                     </p>
                   </div>
                   <div className="rounded-lg bg-white p-2 text-[11px] border border-line">
                     <div className="flex items-center justify-between font-semibold text-ink">
-                      <span>Roadmap Sprint 16 Update</span>
-                      <span className="text-[10px] text-muted font-normal">Yesterday</span>
+                      <span>Experiment 1 Active</span>
+                      <span className="text-[10px] text-muted font-normal">2 / 3 Posts</span>
                     </div>
                     <p className="mt-0.5 text-muted">
-                      TikTok Creator API &amp; Curve Analyzer reached 382 creator votes.
+                      Problem-First cold open is tracking at +10.0% lift vs calibrated baseline.
                     </p>
                   </div>
                 </div>
@@ -129,9 +131,10 @@ export function Topbar({ onOpenMobileMenu }: TopbarProps) {
             )}
           </div>
 
-          {/* User Profile Avatar */}
-          <div className="flex items-center gap-2 pl-1">
+          {/* User Profile Avatar with Interactive Dropdown */}
+          <div className="relative pl-1">
             <button
+              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
               className="flex items-center gap-2 rounded-full p-0.5 focus:outline-none focus:ring-2 focus:ring-brand/40"
               aria-label="User account"
             >
@@ -142,6 +145,69 @@ export function Topbar({ onOpenMobileMenu }: TopbarProps) {
                 <span className="absolute bottom-0 right-0 size-2 rounded-full bg-emerald-500 ring-1 ring-white" />
               </div>
             </button>
+
+            {isUserMenuOpen && (
+              <div className="absolute right-0 top-11 z-40 w-64 rounded-xl border border-line bg-white p-3 shadow-xl animate-in fade-in">
+                <div className="border-b border-[#f0ebe1] pb-2.5">
+                  <p className="text-xs font-bold text-ink">Nate Chen</p>
+                  <p className="text-[11px] text-muted">nate@minimaliststudio.com</p>
+                  <div className="mt-1.5 flex items-center gap-1.5">
+                    <span className="inline-flex items-center rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 border border-emerald-200">
+                      YouTube Linked · 16 Uploads
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-2 space-y-1 text-xs">
+                  <Link
+                    href="/dashboard/content"
+                    onClick={() => setIsUserMenuOpen(false)}
+                    className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-ink hover:bg-cream transition-colors"
+                  >
+                    <Icon name="layers" className="size-3.5 text-muted" />
+                    <span>Content Explorer</span>
+                  </Link>
+
+                  <Link
+                    href="/dashboard/experiments"
+                    onClick={() => setIsUserMenuOpen(false)}
+                    className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-ink hover:bg-cream transition-colors"
+                  >
+                    <Icon name="flask" className="size-3.5 text-muted" />
+                    <span>Experiment Backlog</span>
+                  </Link>
+
+                  <Link
+                    href="/dashboard/youtube"
+                    onClick={() => setIsUserMenuOpen(false)}
+                    className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-ink hover:bg-cream transition-colors"
+                  >
+                    <Icon name="youtube" className="size-3.5 text-red-600" />
+                    <span>Channel Integration</span>
+                  </Link>
+
+                  <Link
+                    href="/onboarding"
+                    onClick={() => setIsUserMenuOpen(false)}
+                    className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-ink hover:bg-cream transition-colors"
+                  >
+                    <Icon name="refresh-cw" className="size-3.5 text-brand" />
+                    <span>Ingestion Pipeline</span>
+                  </Link>
+                </div>
+
+                <div className="mt-2.5 border-t border-[#f0ebe1] pt-2">
+                  <Link
+                    href="/sign-in"
+                    onClick={() => setIsUserMenuOpen(false)}
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    <Icon name="ban" className="size-3.5" />
+                    <span>Sign Out</span>
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </header>

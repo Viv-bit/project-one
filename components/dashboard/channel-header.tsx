@@ -5,14 +5,14 @@ import { Icon } from "@/components/ui";
 import { CHANNEL_PROFILE } from "@/lib/data/intelligence-mock-data";
 
 export function ChannelHeader() {
-  const [baselineOption, setBaselineOption] = useState("Past 50 Posts Baseline");
+  const [baselineOption, setBaselineOption] = useState("Past 16 Posts Baseline");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [exportFeedback, setExportFeedback] = useState<string | null>(null);
 
   const baselineOptions = [
-    "Past 50 Posts Baseline",
+    "Past 16 Posts Baseline",
     "Past 30 Days Ingestion",
-    "Top 20 Long-form Only",
+    "Top 10 Long-form Only",
     "Shorts & Verticals Only",
   ];
 
