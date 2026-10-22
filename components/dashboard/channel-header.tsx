@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Icon } from "@/components/ui";
 import { CHANNEL_PROFILE } from "@/lib/data/intelligence-mock-data";
+import { getCreatorProfile, type CreatorProfileResponse } from "@/lib/creator";
+import { formatCount } from "@/lib/youtube";
 
 export function ChannelHeader() {
+  const [profileData, setProfileData] = useState<CreatorProfileResponse | null>(null);
   const [baselineOption, setBaselineOption] = useState("Past 16 Posts Baseline");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [exportFeedback, setExportFeedback] = useState<string | null>(null);
@@ -15,6 +18,32 @@ export function ChannelHeader() {
     "Top 10 Long-form Only",
     "Shorts & Verticals Only",
   ];
+
+  useEffect(() => {
+    async function fetchProfile() {
+      try {
+        const data = await getCreatorProfile();
+        if (data && data.channel) {
+          setProfileData(data);
+        }
+      } catch {
+        // Keep initial mock profile
+      }
+    }
+    fetchProfile();
+  }, []);
+
+  const channelName = profileData?.channel?.title ?? CHANNEL_PROFILE.name;
+  const channelHandle = profileData?.channel?.handle
+    ? (profileData.channel.handle.startsWith("@") ? profileData.channel.handle : `@${profileData.channel.handle}`)
+    : CHANNEL_PROFILE.handle;
+  const subscribersText = profileData?.channel?.subscriberCount != null
+    ? `${formatCount(profileData.channel.subscriberCount)} Subscribers`
+    : CHANNEL_PROFILE.subscribers;
+  const nicheText = profileData?.profile?.inferredNiche ?? CHANNEL_PROFILE.niche;
+  const tierText = profileData?.profile?.audienceScaleTier ?? "Established (50K–500K)";
+  const coveragePct = profileData?.profile?.classificationCoveragePct ?? 100;
+  const totalAnalyzed = profileData?.profile?.totalVideosAnalyzed ?? 16;
 
   function handleExport(format: "PDF" | "CSV") {
     setExportFeedback(`Exporting ${format} audit report...`);
@@ -30,31 +59,43 @@ export function ChannelHeader() {
         {/* Creator Channel Identity */}
         <div className="flex items-start sm:items-center gap-4">
           <div className="relative size-14 shrink-0 overflow-hidden rounded-2xl border-2 border-white bg-gradient-to-br from-amber-700 via-stone-800 to-ink shadow-md">
-            <div className="grid h-full w-full place-items-center text-white">
-              <Icon name="video" className="size-6 text-amber-200" />
-            </div>
+            {profileData?.channel?.thumbnailUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={profileData.channel.thumbnailUrl}
+                alt={channelName}
+                className="size-full object-cover"
+              />
+            ) : (
+              <div className="grid h-full w-full place-items-center text-white">
+                <Icon name="video" className="size-6 text-amber-200" />
+              </div>
+            )}
           </div>
 
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="font-serif text-2xl sm:text-3xl font-medium tracking-tight text-ink">
-                {CHANNEL_PROFILE.name}
+                {channelName}
               </h1>
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-200">
                 <Icon name="check" className="size-3 text-emerald-600" />
                 Partner
               </span>
+              <span className="inline-flex items-center rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-semibold text-brand border border-brand/20">
+                Tier: {tierText}
+              </span>
             </div>
 
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#786f65]">
-              <span className="font-medium text-ink">{CHANNEL_PROFILE.handle}</span>
+              <span className="font-medium text-ink">{channelHandle}</span>
               <span>·</span>
-              <span>{CHANNEL_PROFILE.subscribers}</span>
+              <span>{subscribersText}</span>
               <span>·</span>
-              <span>{CHANNEL_PROFILE.lastIngested}</span>
+              <span>{totalAnalyzed} Ingested Videos</span>
               <span>·</span>
               <span className="rounded bg-[#f5efe6] px-1.5 py-0.5 text-[11px] font-medium text-[#736a60]">
-                Niche: {CHANNEL_PROFILE.niche}
+                Niche: {nicheText}
               </span>
             </div>
           </div>
@@ -62,13 +103,15 @@ export function ChannelHeader() {
 
         {/* Right Status & Action Controls */}
         <div className="flex flex-wrap items-center gap-3">
-          {/* Live Ingestion Indicator */}
+          {/* Live Ingestion Indicator & AI Coverage */}
           <div className="flex items-center gap-2 rounded-xl bg-[#faf7f2] border border-[#e8e2d8] px-3 py-1.5 text-xs font-medium text-[#6b6257]">
             <span className="relative flex size-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
             </span>
-            <span>{CHANNEL_PROFILE.status}</span>
+            <span>
+              {coveragePct}% AI Classified · {CHANNEL_PROFILE.status}
+            </span>
           </div>
 
           {/* Baseline Dropdown */}

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Icon } from "@/components/ui";
 
 type RoadmapHeaderProps = {

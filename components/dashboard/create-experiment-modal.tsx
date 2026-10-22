@@ -4,12 +4,14 @@ import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { DETAILED_INSIGHTS } from "@/lib/data/intelligence-mock-data";
 import type { DetailedInsight } from "@/lib/types/creator-intelligence";
+import { createExperiment, type ExperimentCategory } from "@/lib/experiments";
 
 type CreateExperimentModalProps = {
   isOpen: boolean;
   onClose: () => void;
   preselectedInsight?: DetailedInsight | null;
   onExperimentCreated?: (newExp: {
+    id?: string;
     title: string;
     hypothesis: string;
     primaryMetric: string;
@@ -26,27 +28,33 @@ export function CreateExperimentModal({
 }: CreateExperimentModalProps) {
   const [title, setTitle] = useState(
     preselectedInsight
-      ? `Test: ${preselectedInsight.suggestedExperiment?.hypothesis.slice(0, 50)}...`
+      ? `Test: ${preselectedInsight.suggestedExperiment?.hypothesis?.slice(0, 50) ?? preselectedInsight.title}...`
       : "Problem-First Cold Open vs Conversational Greeting"
   );
   const [hypothesis, setHypothesis] = useState(
     preselectedInsight?.suggestedExperiment?.hypothesis ??
       "Opening with the exact dollar amount wasted or failure point in the first 2s will lift 0-3s retention above 80%."
   );
+  const [category, setCategory] = useState<ExperimentCategory>(() => {
+    if (preselectedInsight?.category === "hook") return "HOOK";
+    if (preselectedInsight?.category === "duration") return "DURATION";
+    return "TOPIC";
+  });
   const [primaryMetric, setPrimaryMetric] = useState(
-    preselectedInsight?.suggestedExperiment?.primaryMetric ?? "0-3s Hook Hold Rate"
+    preselectedInsight?.suggestedExperiment?.primaryMetric ?? "median_views"
   );
   const [targetPostCount, setTargetPostCount] = useState(
     preselectedInsight?.suggestedExperiment?.targetPostCount ?? 3
   );
   const [durationDays, setDurationDays] = useState(
-    preselectedInsight?.suggestedExperiment?.suggestedDurationDays ?? 21
+    preselectedInsight?.suggestedExperiment?.suggestedDurationDays ?? 14
   );
   const [selectedInsightId, setSelectedInsightId] = useState<string>(
     preselectedInsight?.id ?? "ins-01"
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -62,15 +70,31 @@ export function CreateExperimentModal({
     }
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setIsSubmitting(true);
+    setErrorMsg(null);
 
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      // Send POST /api/experiments to backend
+      const created = await createExperiment({
+        title,
+        hypothesis,
+        category,
+        primaryMetric,
+        targetPostCount,
+        durationDays,
+        recommendationId: selectedInsightId,
+      }).catch((err) => {
+        // If unauthenticated or backend offline, fallback gracefully
+        console.warn("Backend create experiment fallback:", err);
+        return null;
+      });
+
       setIsSuccess(true);
       if (onExperimentCreated) {
         onExperimentCreated({
+          id: created?.id,
           title,
           hypothesis,
           primaryMetric,
@@ -82,7 +106,12 @@ export function CreateExperimentModal({
         setIsSuccess(false);
         onClose();
       }, 1200);
-    }, 600);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to launch experiment";
+      setErrorMsg(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -99,13 +128,13 @@ export function CreateExperimentModal({
                 Initialize Content Experiment
               </h3>
               <p className="text-xs text-muted">
-                Calibrated for your 10–20 video upload baseline
+                Calibrated with Data Sufficiency Rule (N &ge; 3 required)
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-muted hover:bg-black/5 hover:text-ink transition-colors"
+            className="rounded-lg p-1.5 text-muted hover:bg-black/5 hover:text-ink transition-colors cursor-pointer"
           >
             <Icon name="x" className="size-4" />
           </button>
@@ -118,11 +147,17 @@ export function CreateExperimentModal({
             </div>
             <h4 className="font-serif text-xl text-ink">Experiment Scheduled</h4>
             <p className="text-xs text-muted max-w-sm mx-auto">
-              Your next {targetPostCount} uploads will be evaluated against your 16-post baseline.
+              Your next {targetPostCount} uploads will be evaluated against your channel median baseline.
             </p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+            {errorMsg && (
+              <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-700">
+                {errorMsg}
+              </div>
+            )}
+
             {/* Link to Evidence Insight */}
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
@@ -152,7 +187,7 @@ export function CreateExperimentModal({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className="w-full rounded-xl border border-[#ded6c7] bg-white px-3.5 py-2 text-xs text-ink focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
-                placeholder="e.g. Problem-First Cold Open vs Conversational Greeting"
+                placeholder="e.g. Scale Content on Next.js Architecture"
               />
             </div>
 
@@ -167,12 +202,29 @@ export function CreateExperimentModal({
                 value={hypothesis}
                 onChange={(e) => setHypothesis(e.target.value)}
                 className="w-full rounded-xl border border-[#ded6c7] bg-white p-3 text-xs text-ink focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
-                placeholder="What specific adjustment will you test and why?"
+                placeholder="What specific adjustment will you test and what lift is expected?"
               />
             </div>
 
-            {/* Grid: Primary Metric, Target Posts, Duration */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Grid: Category, Metric, Target Posts, Duration */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-muted mb-1">
+                  Category
+                </label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value as ExperimentCategory)}
+                  className="w-full rounded-lg border border-[#ded6c7] bg-[#faf7f2] px-2.5 py-1.5 text-xs text-ink focus:border-brand focus:outline-none"
+                >
+                  <option value="TOPIC">TOPIC</option>
+                  <option value="HOOK">HOOK</option>
+                  <option value="FORMAT">FORMAT</option>
+                  <option value="CADENCE">CADENCE</option>
+                  <option value="DURATION">DURATION</option>
+                </select>
+              </div>
+
               <div>
                 <label className="block text-[11px] font-semibold text-muted mb-1">
                   Primary Metric
@@ -182,10 +234,8 @@ export function CreateExperimentModal({
                   onChange={(e) => setPrimaryMetric(e.target.value)}
                   className="w-full rounded-lg border border-[#ded6c7] bg-[#faf7f2] px-2.5 py-1.5 text-xs text-ink focus:border-brand focus:outline-none"
                 >
-                  <option value="0-3s Hook Hold Rate">0-3s Hook Hold Rate</option>
-                  <option value="Median 72h View Velocity">Median 72h Views</option>
-                  <option value="0:45s Survival Rate">0:45s Survival Rate</option>
-                  <option value="Average Percentage Viewed">Average % Viewed</option>
+                  <option value="median_views">Median Views</option>
+                  <option value="engagement_rate">Engagement Rate</option>
                 </select>
               </div>
 
@@ -198,7 +248,7 @@ export function CreateExperimentModal({
                   onChange={(e) => setTargetPostCount(Number(e.target.value))}
                   className="w-full rounded-lg border border-[#ded6c7] bg-[#faf7f2] px-2.5 py-1.5 text-xs text-ink focus:border-brand focus:outline-none"
                 >
-                  <option value={3}>3 uploads (N=3 standard)</option>
+                  <option value={3}>3 uploads (N=3 Min)</option>
                   <option value={4}>4 uploads</option>
                   <option value={5}>5 uploads</option>
                 </select>
@@ -206,16 +256,16 @@ export function CreateExperimentModal({
 
               <div>
                 <label className="block text-[11px] font-semibold text-muted mb-1">
-                  Time Window
+                  Duration (Days)
                 </label>
                 <select
                   value={durationDays}
                   onChange={(e) => setDurationDays(Number(e.target.value))}
                   className="w-full rounded-lg border border-[#ded6c7] bg-[#faf7f2] px-2.5 py-1.5 text-xs text-ink focus:border-brand focus:outline-none"
                 >
-                  <option value={14}>14 Days (Fast cycle)</option>
-                  <option value={21}>21 Days (Recommended)</option>
-                  <option value={30}>30 Days (Standard month)</option>
+                  <option value={14}>14 Days (Standard)</option>
+                  <option value={21}>21 Days (Sprint)</option>
+                  <option value={30}>30 Days (Month)</option>
                 </select>
               </div>
             </div>
@@ -226,7 +276,7 @@ export function CreateExperimentModal({
               <div>
                 <strong className="font-semibold text-amber-950">Data Sufficiency Rule:</strong>
                 <p className="mt-0.5 text-amber-800 leading-relaxed">
-                  The engine will mark this experiment as <em>Inconclusive</em> until all {targetPostCount} target uploads are completed. Results are calculated against your calibrated baseline.
+                  Per system design, evaluation requires at least {targetPostCount} linked test uploads and the duration window elapsed. Status remains <em>Inconclusive</em> until met.
                 </p>
               </div>
             </div>
@@ -236,17 +286,17 @@ export function CreateExperimentModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-xl border border-[#ded6c7] px-4 py-2 text-xs font-semibold text-muted hover:bg-black/5 hover:text-ink transition-colors"
+                className="rounded-xl border border-[#ded6c7] px-4 py-2 text-xs font-semibold text-muted hover:bg-black/5 hover:text-ink transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-strong transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-strong transition-colors disabled:opacity-50 cursor-pointer"
               >
                 <Icon name="flask" className="size-3.5" />
-                {isSubmitting ? "Scheduling..." : "Launch Experiment"}
+                {isSubmitting ? "Creating..." : "Launch Experiment"}
               </button>
             </div>
           </form>

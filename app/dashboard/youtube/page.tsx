@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Brand, CreatorBadge } from "@/components/auth/brand";
 import { YouTubeConnectionManager } from "@/components/youtube/youtube-connection-manager";
-import { Chip, Icon } from "@/components/ui";
+import { YouTubeVideoIngestPanel } from "@/components/youtube/youtube-video-ingest-panel";
+import { Icon } from "@/components/ui";
 
 export const metadata: Metadata = {
   title: "YouTube Channel Settings",
@@ -48,6 +48,11 @@ export default async function YouTubePage({ searchParams }: YouTubePageProps) {
         {/* Connection Manager Card */}
         <div className="mb-8">
           <YouTubeConnectionManager initialError={error} />
+        </div>
+
+        {/* Video Ingest & Gemini AI Classification Panel */}
+        <div className="mb-8">
+          <YouTubeVideoIngestPanel />
         </div>
 
         {/* Security & FAQ Section */}
