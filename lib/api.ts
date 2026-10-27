@@ -1,5 +1,5 @@
 export const apiUrl =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+  process.env.NEXT_PUBLIC_API_URL ?? "https://project-one-be-eb1t.onrender.com";
 
 export const googleAuthUrl = `${apiUrl}/api/auth/google`;
 export const authSignupUrl = `${apiUrl}/api/auth/signup`;
