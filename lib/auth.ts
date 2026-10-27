@@ -39,34 +39,29 @@ export type SigninCredentials = {
 export async function signupUser(
   credentials: SignupCredentials,
 ): Promise<AuthSuccessResponse> {
-  const response = await fetch(authSignupUrl, {
+  const { email, password } = credentials;
+  const res = await fetch(authSignupUrl, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      email: credentials.email.trim(),
-      password: credentials.password,
-    }),
+    body: JSON.stringify({ email, password }),
   });
 
-  if (!response.ok) {
-    const errorBody = (await response.json().catch(() => null)) as
+  if (!res.ok) {
+    const errorBody = (await res.json().catch(() => null)) as
       | AuthValidationErrorResponse
       | null;
 
     const message =
       errorBody?.message ??
-      (response.status === 409
+      (res.status === 409
         ? "An account with this email already exists"
-        : `Signup failed (${response.status})`);
+        : `Signup failed (${res.status})`);
 
-    throw new AuthApiError(message, response.status, errorBody?.errors);
+    throw new AuthApiError(message, res.status, errorBody?.errors);
   }
 
-  return (await response.json()) as AuthSuccessResponse;
+  return (await res.json()) as AuthSuccessResponse;
 }
 
 /**
@@ -76,34 +71,29 @@ export async function signupUser(
 export async function signinUser(
   credentials: SigninCredentials,
 ): Promise<AuthSuccessResponse> {
-  const response = await fetch(authSigninUrl, {
+  const { email, password } = credentials;
+  const res = await fetch(authSigninUrl, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      email: credentials.email.trim(),
-      password: credentials.password,
-    }),
+    body: JSON.stringify({ email, password }),
   });
 
-  if (!response.ok) {
-    const errorBody = (await response.json().catch(() => null)) as
+  if (!res.ok) {
+    const errorBody = (await res.json().catch(() => null)) as
       | AuthValidationErrorResponse
       | null;
 
     const message =
       errorBody?.message ??
-      (response.status === 401
+      (res.status === 401
         ? "Invalid email or password"
-        : `Sign-in failed (${response.status})`);
+        : `Sign-in failed (${res.status})`);
 
-    throw new AuthApiError(message, response.status, errorBody?.errors);
+    throw new AuthApiError(message, res.status, errorBody?.errors);
   }
 
-  return (await response.json()) as AuthSuccessResponse;
+  return (await res.json()) as AuthSuccessResponse;
 }
 
 /**
