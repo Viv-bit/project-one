@@ -4,11 +4,15 @@ import { useState } from "react";
 import { Icon } from "@/components/ui";
 import { EXPERIMENT_HYPOTHESES } from "@/lib/data/intelligence-mock-data";
 import type { ExperimentHypothesis } from "@/lib/types/creator-intelligence";
-
+import { startYouTubeOAuth } from "@/lib/youtube";
+import { useYouTubeConnection } from "@/lib/youtube-connection-context";
 import Link from "next/link";
 
 export function ExperimentBacklogWidget() {
-  const [hypotheses, setHypotheses] = useState<ExperimentHypothesis[]>(EXPERIMENT_HYPOTHESES);
+  const { isConnected } = useYouTubeConnection();
+  const [hypotheses, setHypotheses] = useState<ExperimentHypothesis[]>(() =>
+    isConnected ? EXPERIMENT_HYPOTHESES : []
+  );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newPredictedLift, setNewPredictedLift] = useState("+15% Watch Time");
@@ -32,6 +36,9 @@ export function ExperimentBacklogWidget() {
     setIsModalOpen(false);
   }
 
+  // Empty state when YouTube is not connected AND no hypotheses drafted yet
+  const showEmptyState = !isConnected && hypotheses.length === 0;
+
   return (
     <>
       <div className="rounded-2xl border border-[#e6e0d6] bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] sm:p-6">
@@ -43,45 +50,74 @@ export function ExperimentBacklogWidget() {
             </span>
             <h2 className="text-base font-semibold text-ink">Experiment Backlog</h2>
           </div>
-          <Link
-            href="/dashboard/experiments"
-            className="rounded-full bg-[#f6f2ea] border border-[#e8e2d8] px-2 py-0.5 text-[10px] font-semibold text-brand hover:underline"
-          >
-            {hypotheses.length} Active Tests &rarr;
-          </Link>
-        </div>
-
-        {/* Hypotheses List */}
-        <div className="mt-3.5 space-y-3">
-          {hypotheses.map((hyp) => (
-            <div
-              key={hyp.id}
-              className="rounded-xl border border-[#ede7dd] bg-[#faf8f4] p-3.5 transition-all hover:border-brand/40"
+          {isConnected ? (
+            <Link
+              href="/dashboard/experiments"
+              className="rounded-full bg-[#f6f2ea] border border-[#e8e2d8] px-2 py-0.5 text-[10px] font-semibold text-brand hover:underline"
             >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-ink">
-                  Hypothesis #{hyp.hypothesisNumber}
-                </span>
-                <span className="rounded bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800">
-                  {hyp.confidencePct}% Confidence
-                </span>
-              </div>
-
-              <p className="mt-2 text-xs font-semibold text-ink leading-snug">
-                {hyp.title}
-              </p>
-
-              <div className="mt-2.5 flex items-center justify-between text-[11px] text-[#7a7167] border-t border-[#ede7dd]/80 pt-2">
-                <span className="font-semibold text-emerald-700">
-                  {hyp.predictedLift}
-                </span>
-                <span className="font-mono text-[10px] text-[#8e8479]">
-                  {hyp.sampleSizeNote}
-                </span>
-              </div>
-            </div>
-          ))}
+              {hypotheses.length} Active Tests &rarr;
+            </Link>
+          ) : (
+            <span className="rounded-full bg-[#f6f2ea] border border-[#e8e2d8] px-2 py-0.5 text-[10px] font-semibold text-[#8a7f72]">
+              {hypotheses.length} Active Tests
+            </span>
+          )}
         </div>
+
+        {/* Empty state or Hypotheses List */}
+        {showEmptyState ? (
+          <div className="mt-4 rounded-xl border border-dashed border-[#ded4c6] bg-[#faf8f4] p-5 text-center">
+            <div className="mx-auto grid size-10 place-items-center rounded-xl bg-white border border-[#e4dacf] text-brand shadow-sm">
+              <Icon name="flask" className="size-5" />
+            </div>
+
+            <h3 className="mt-2.5 font-serif text-sm font-semibold text-ink">
+              No Active Experiments
+            </h3>
+            <p className="mt-1 text-xs text-[#70665b] leading-relaxed">
+              Connect your YouTube channel to generate automated title &amp; hook hypotheses, or draft your first manual test.
+            </p>
+
+            <button
+              onClick={() => startYouTubeOAuth()}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-[#ded4c6] bg-white px-3 py-1.5 text-xs font-semibold text-[#5c5348] hover:bg-[#faf7f2] transition-colors"
+            >
+              <Icon name="youtube" className="size-3.5 text-red-600" />
+              <span>Connect for AI Tests</span>
+            </button>
+          </div>
+        ) : (
+          <div className="mt-3.5 space-y-3">
+            {hypotheses.map((hyp) => (
+              <div
+                key={hyp.id}
+                className="rounded-xl border border-[#ede7dd] bg-[#faf8f4] p-3.5 transition-all hover:border-brand/40"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-ink">
+                    Hypothesis #{hyp.hypothesisNumber}
+                  </span>
+                  <span className="rounded bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800">
+                    {hyp.confidencePct}% Confidence
+                  </span>
+                </div>
+
+                <p className="mt-2 text-xs font-semibold text-ink leading-snug">
+                  {hyp.title}
+                </p>
+
+                <div className="mt-2.5 flex items-center justify-between text-[11px] text-[#7a7167] border-t border-[#ede7dd]/80 pt-2">
+                  <span className="font-semibold text-emerald-700">
+                    {hyp.predictedLift}
+                  </span>
+                  <span className="font-mono text-[10px] text-[#8e8479]">
+                    {hyp.sampleSizeNote}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Action Button: Draft New Script Hypothesis */}
         <button

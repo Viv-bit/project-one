@@ -1,10 +1,16 @@
 import {
   authSigninUrl,
   authSignupUrl,
+  authLogoutUrl,
   googleAuthUrl,
+  logoutUser,
+  handleAuthError,
+  apiFetch,
   type AuthSuccessResponse,
   type AuthValidationErrorResponse,
 } from "./api";
+
+export { authLogoutUrl, logoutUser, handleAuthError, apiFetch };
 
 export class AuthApiError extends Error {
   status: number;

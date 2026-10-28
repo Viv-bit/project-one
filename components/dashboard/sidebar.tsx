@@ -5,12 +5,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "@/components/ui";
 import { CHANNEL_PROFILE } from "@/lib/data/intelligence-mock-data";
+import { useYouTubeConnection } from "@/lib/youtube-connection-context";
+import { startYouTubeOAuth } from "@/lib/youtube";
 
 type NavItem = {
   label: string;
   href: string;
   icon: IconName;
   badge?: string;
+  unconnectedBadge?: string;
   exact?: boolean;
 };
 
@@ -34,18 +37,21 @@ const NAVIGATION_GROUPS: NavGroup[] = [
         href: "/dashboard/content",
         icon: "layers",
         badge: "16 Posts",
+        unconnectedBadge: "0 Posts",
       },
       {
         label: "Peer Benchmarks",
         href: "/dashboard/benchmarks",
         icon: "users",
         badge: "18 Peers",
+        unconnectedBadge: "Locked",
       },
       {
         label: "Evidence & Insights",
         href: "/dashboard/insights",
         icon: "brain",
         badge: "3 Actions",
+        unconnectedBadge: "0 Actions",
       },
     ],
   },
@@ -62,6 +68,7 @@ const NAVIGATION_GROUPS: NavGroup[] = [
         href: "/dashboard/experiments",
         icon: "flask",
         badge: "2 Active",
+        unconnectedBadge: "0 Active",
       },
     ],
   },
@@ -78,6 +85,7 @@ const NAVIGATION_GROUPS: NavGroup[] = [
         href: "/onboarding",
         icon: "refresh-cw",
         badge: "Live",
+        unconnectedBadge: "Unlinked",
       },
     ],
   },
@@ -90,6 +98,7 @@ type SidebarProps = {
 export function Sidebar({ onCloseMobile }: SidebarProps) {
   const pathname = usePathname();
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  const { isConnected, channel } = useYouTubeConnection();
 
   function isItemActive(item: NavItem): boolean {
     if (item.exact) {
@@ -100,6 +109,14 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
     }
     return pathname.startsWith(item.href) && item.href !== "/dashboard";
   }
+
+  const workspaceName = isConnected
+    ? (channel?.title ?? CHANNEL_PROFILE.name)
+    : "No Channel Connected";
+
+  const workspaceSubtitle = isConnected
+    ? (channel?.handle ?? CHANNEL_PROFILE.ownerName)
+    : "Click to link YouTube";
 
   return (
     <aside className="flex h-full w-64 flex-col justify-between border-r border-[#e6e0d6] bg-[#fbf8f4] text-ink select-none">
@@ -143,14 +160,18 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
           >
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="grid size-7 shrink-0 place-items-center rounded-lg bg-[#efe9df] text-xs font-semibold text-[#665e55]">
-                NC
+                {isConnected ? (
+                  channel?.title ? channel.title.slice(0, 2).toUpperCase() : "NC"
+                ) : (
+                  <Icon name="youtube" className="size-4 text-[#e62117]" />
+                )}
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-ink truncate leading-tight">
-                  {CHANNEL_PROFILE.name}
+                  {workspaceName}
                 </p>
                 <p className="text-[11px] text-[#857c72] truncate leading-tight mt-0.5">
-                  {CHANNEL_PROFILE.ownerName}
+                  {workspaceSubtitle}
                 </p>
               </div>
             </div>
@@ -164,17 +185,32 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
           {workspaceOpen && (
             <div className="absolute left-3 right-3 top-14 z-30 rounded-xl border border-line bg-white p-1.5 shadow-lg animate-in fade-in slide-in-from-top-1">
               <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
-                Active Channels
+                Channel Connection
               </div>
-              <div className="flex items-center justify-between rounded-lg bg-cream/70 px-2 py-1.5 text-xs font-medium text-ink">
-                <span>The Minimalist Studio</span>
-                <Icon name="check" className="size-3.5 text-brand" />
-              </div>
-              <div className="mt-1 flex items-center justify-between rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-cream/40 cursor-pointer">
-                <span>Studio Craft Shorts (Beta)</span>
-                <span className="text-[10px] text-muted">14.2k</span>
-              </div>
+              {isConnected ? (
+                <div className="flex items-center justify-between rounded-lg bg-cream/70 px-2 py-1.5 text-xs font-medium text-ink">
+                  <span className="truncate">{workspaceName}</span>
+                  <Icon name="check" className="size-3.5 text-brand shrink-0" />
+                </div>
+              ) : (
+                <div className="rounded-lg bg-amber-50/80 border border-amber-200/60 p-2 text-xs text-amber-800">
+                  <p className="font-semibold">No YouTube Account</p>
+                  <p className="mt-0.5 text-[11px] text-amber-700">
+                    Connect your channel to sync video telemetry.
+                  </p>
+                </div>
+              )}
               <div className="my-1 border-t border-line" />
+              <button
+                onClick={() => {
+                  setWorkspaceOpen(false);
+                  startYouTubeOAuth();
+                }}
+                className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-[#e62117] hover:bg-red-50 transition-colors text-left"
+              >
+                <Icon name="youtube" className="size-3.5" />
+                <span>{isConnected ? "Switch YouTube Channel" : "Connect YouTube Channel"}</span>
+              </button>
               <Link
                 href="/dashboard/youtube"
                 onClick={() => {
@@ -183,8 +219,8 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
                 }}
                 className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-brand hover:bg-brand/5"
               >
-                <Icon name="plus" className="size-3" />
-                Connect New YouTube Channel
+                <Icon name="settings" className="size-3" />
+                <span>Integration Settings</span>
               </Link>
             </div>
           )}
@@ -200,6 +236,7 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
               <ul className="mt-1.5 space-y-0.5">
                 {group.items.map((item) => {
                   const active = isItemActive(item);
+                  const badge = isConnected ? item.badge : (item.unconnectedBadge ?? item.badge);
                   return (
                     <li key={item.label}>
                       <Link
@@ -220,7 +257,7 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
                           />
                           <span>{item.label}</span>
                         </div>
-                        {item.badge ? (
+                        {badge ? (
                           <span
                             className={`rounded px-1.5 py-0.2 text-[9px] font-semibold ${
                               active
@@ -228,7 +265,7 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
                                 : "bg-black/5 text-muted"
                             }`}
                           >
-                            {item.badge}
+                            {badge}
                           </span>
                         ) : null}
                       </Link>
@@ -248,15 +285,18 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
           <div className="flex items-center justify-between text-[11px]">
             <span className="font-medium text-[#7a7268]">Data Compute</span>
             <span className="font-mono font-semibold text-ink">
-              {CHANNEL_PROFILE.computeUsed.toLocaleString()} /{" "}
-              {Math.round(CHANNEL_PROFILE.computeLimit / 1000)}k
+              {isConnected
+                ? `${CHANNEL_PROFILE.computeUsed.toLocaleString()} / ${Math.round(CHANNEL_PROFILE.computeLimit / 1000)}k`
+                : "0 / 10k"}
             </span>
           </div>
           <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[#ece5da]">
             <div
               className="h-full rounded-full bg-brand transition-all duration-500"
               style={{
-                width: `${(CHANNEL_PROFILE.computeUsed / CHANNEL_PROFILE.computeLimit) * 100}%`,
+                width: isConnected
+                  ? `${(CHANNEL_PROFILE.computeUsed / CHANNEL_PROFILE.computeLimit) * 100}%`
+                  : "0%",
               }}
             />
           </div>
@@ -265,7 +305,7 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
         {/* Footer row */}
         <div className="mt-3 flex items-center justify-between px-1 text-xs text-[#8a8176]">
           <Link
-            href="/dashboard?view=settings"
+            href="/dashboard/youtube"
             onClick={onCloseMobile}
             className="flex items-center gap-1.5 transition-colors hover:text-ink"
           >

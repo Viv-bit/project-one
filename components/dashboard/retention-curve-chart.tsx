@@ -3,8 +3,12 @@
 import { useState } from "react";
 import type { RetentionFormat } from "@/lib/types/creator-intelligence";
 import { RETENTION_CURVE_DATA } from "@/lib/data/intelligence-mock-data";
+import { Icon } from "@/components/ui";
+import { startYouTubeOAuth } from "@/lib/youtube";
+import { useYouTubeConnection } from "@/lib/youtube-connection-context";
 
 export function RetentionCurveChart() {
+  const { isConnected } = useYouTubeConnection();
   const [selectedFormat, setSelectedFormat] = useState<RetentionFormat>("all");
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
@@ -23,7 +27,6 @@ export function RetentionCurveChart() {
     return paddingX + (timeSec / maxTime) * chartWidth;
   }
   function getY(holdPct: number) {
-    // Hold percentage ranges between ~25% and 100%
     const minHold = 20;
     const maxHold = 100;
     const normalized = (holdPct - minHold) / (maxHold - minHold);
@@ -59,15 +62,149 @@ export function RetentionCurveChart() {
 
   const primaryPath = generateSmoothPath(primaryPoints);
   const benchmarkPath = generateSmoothPath(benchmarkPoints);
-
-  // Area path for gradient fill
   const areaPath = `${primaryPath} L ${primaryPoints[primaryPoints.length - 1].x} ${height - paddingY} L ${primaryPoints[0].x} ${height - paddingY} Z`;
-
   const thresholdX = getX(3);
+  const activeHover = hoveredIndex !== null ? RETENTION_CURVE_DATA[hoveredIndex] : null;
 
-  const activeHover =
-    hoveredIndex !== null ? RETENTION_CURVE_DATA[hoveredIndex] : null;
+  // Empty state when YouTube is not connected
+  if (!isConnected) {
+    return (
+      <div className="relative overflow-hidden rounded-2xl border border-dashed border-[#ded4c6] bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] sm:p-6">
+        {/* Header & Disabled Format Toggle */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-[#f2ede4] pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-semibold text-ink">
+                Retention &amp; Hook Velocity Curve
+              </h2>
+              <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                Awaiting Connection
+              </span>
+            </div>
+            <p className="text-xs text-[#82786e]">
+              Second-by-second drop-off curve across initial 60 seconds of video timeline
+            </p>
+          </div>
 
+          <div className="flex items-center rounded-xl bg-[#faf7f2] border border-[#e8e2d8] p-1 opacity-50 cursor-not-allowed">
+            <span className="rounded-lg px-3 py-1 text-xs font-semibold bg-white text-[#998f84] shadow-sm">
+              All Formats
+            </span>
+            <span className="px-3 py-1 text-xs text-[#998f84]">Longform</span>
+            <span className="px-3 py-1 text-xs text-[#998f84]">Shorts</span>
+          </div>
+        </div>
+
+        {/* Ghost SVG Grid with Centered Empty State Overlay */}
+        <div className="relative mt-4 w-full overflow-hidden rounded-xl bg-[#faf8f4]/60 p-4 border border-[#eee7dc]">
+          {/* Faint Background SVG Grid */}
+          <svg
+            viewBox={`0 0 ${width} ${height}`}
+            className="w-full h-auto opacity-25 select-none"
+          >
+            {[100, 75, 50, 25].map((level) => (
+              <line
+                key={level}
+                x1={paddingX}
+                y1={getY(level)}
+                x2={width - paddingX}
+                y2={getY(level)}
+                stroke="#cfb799"
+                strokeWidth="1"
+                strokeDasharray="4 4"
+              />
+            ))}
+            {/* Ghost dashed curve */}
+            <path
+              d={benchmarkPath}
+              fill="none"
+              stroke="#cfb799"
+              strokeWidth="2"
+              strokeDasharray="6 6"
+            />
+            {/* Faint X-axis markers */}
+            {RETENTION_CURVE_DATA.map((d) => (
+              <text
+                key={d.timeSec}
+                x={getX(d.timeSec)}
+                y={height - 6}
+                textAnchor="middle"
+                className="text-[10px] font-mono fill-[#968d83]"
+              >
+                {d.timeLabel}
+              </text>
+            ))}
+          </svg>
+
+          {/* Centered Empty State Card */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
+            <div className="grid size-12 place-items-center rounded-2xl bg-white border border-[#e2d7c9] text-brand shadow-sm">
+              <Icon name="activity" className="size-6" />
+            </div>
+
+            <h3 className="mt-3 font-serif text-lg sm:text-xl font-medium text-ink">
+              Retention Diagnostics Unavailable
+            </h3>
+            <p className="mt-1.5 max-w-md text-xs sm:text-[13px] text-[#70665b] leading-relaxed">
+              Connect your YouTube channel to analyze your first 3-second hook drop-off rates, benchmark against cohort curves, and identify where viewers churn.
+            </p>
+
+            <button
+              onClick={() => startYouTubeOAuth()}
+              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#e62117] px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-[#cc1810]"
+            >
+              <Icon name="youtube" className="size-4" />
+              <span>Connect YouTube Channel</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Bottom Retention Breakdown Empty Cards (3 Columns) */}
+        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3 pt-4 border-t border-[#f2ede4]">
+          <div className="rounded-xl border border-dashed border-[#ded4c6] bg-[#faf7f2]/70 p-3">
+            <div className="flex items-center gap-1.5">
+              <span className="size-2 rounded-full bg-[#c2b6a8]" />
+              <span className="text-xs font-semibold text-[#7d7367]">Problem-First</span>
+            </div>
+            <p className="mt-1 font-serif text-lg text-[#a89d91] font-medium">
+              — <span className="text-xs font-sans text-muted font-normal">at 0:03s</span>
+            </p>
+            <span className="mt-0.5 inline-block text-[11px] font-medium text-[#9c9185]">
+              Awaiting video sync
+            </span>
+          </div>
+
+          <div className="rounded-xl border border-dashed border-[#ded4c6] bg-[#faf7f2]/70 p-3">
+            <div className="flex items-center gap-1.5">
+              <span className="size-2 rounded-full bg-[#c2b6a8]" />
+              <span className="text-xs font-semibold text-[#7d7367]">Narrative Arc</span>
+            </div>
+            <p className="mt-1 font-serif text-lg text-[#a89d91] font-medium">
+              — <span className="text-xs font-sans text-muted font-normal">at 0:03s</span>
+            </p>
+            <span className="mt-0.5 inline-block text-[11px] font-medium text-[#9c9185]">
+              Studio benchmark locked
+            </span>
+          </div>
+
+          <div className="rounded-xl border border-dashed border-[#ded4c6] bg-[#faf7f2]/70 p-3">
+            <div className="flex items-center gap-1.5">
+              <span className="size-2 rounded-full bg-[#c2b6a8]" />
+              <span className="text-xs font-semibold text-[#7d7367]">Curiosity Gap</span>
+            </div>
+            <p className="mt-1 font-serif text-lg text-[#a89d91] font-medium">
+              — <span className="text-xs font-sans text-muted font-normal">at 0:03s</span>
+            </p>
+            <span className="mt-0.5 inline-block text-[11px] font-medium text-[#9c9185]">
+              Drop-off analysis locked
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Connected state
   return (
     <div className="rounded-2xl border border-[#e6e0d6] bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] sm:p-6">
       {/* Header & Format Toggle */}

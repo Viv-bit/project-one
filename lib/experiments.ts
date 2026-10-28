@@ -1,4 +1,4 @@
-import { experimentsUrl } from "./api";
+import { apiFetch, experimentsUrl } from "./api";
 
 export type ExperimentCategory =
   | "TOPIC"
@@ -97,7 +97,7 @@ export type UpdateExperimentPayload = {
 };
 
 export async function getExperiments(): Promise<ApiExperiment[]> {
-  const response = await fetch(experimentsUrl, {
+  const response = await apiFetch(experimentsUrl, {
     method: "GET",
     credentials: "include",
     headers: {
@@ -118,7 +118,7 @@ export async function getExperiments(): Promise<ApiExperiment[]> {
 }
 
 export async function getExperimentById(id: string): Promise<ApiExperiment | null> {
-  const response = await fetch(`${experimentsUrl}/${encodeURIComponent(id)}`, {
+  const response = await apiFetch(`${experimentsUrl}/${encodeURIComponent(id)}`, {
     method: "GET",
     credentials: "include",
     headers: {
@@ -139,7 +139,7 @@ export async function getExperimentById(id: string): Promise<ApiExperiment | nul
 export async function createExperiment(
   payload: CreateExperimentPayload,
 ): Promise<ApiExperiment> {
-  const response = await fetch(experimentsUrl, {
+  const response = await apiFetch(experimentsUrl, {
     method: "POST",
     credentials: "include",
     headers: {
@@ -162,7 +162,7 @@ export async function updateExperiment(
   id: string,
   payload: UpdateExperimentPayload,
 ): Promise<ApiExperiment> {
-  const response = await fetch(`${experimentsUrl}/${encodeURIComponent(id)}`, {
+  const response = await apiFetch(`${experimentsUrl}/${encodeURIComponent(id)}`, {
     method: "PATCH",
     credentials: "include",
     headers: {
@@ -185,7 +185,7 @@ export async function linkPostToExperiment(
   experimentId: string,
   postId: string,
 ): Promise<ApiExperiment> {
-  const response = await fetch(`${experimentsUrl}/${encodeURIComponent(experimentId)}/posts`, {
+  const response = await apiFetch(`${experimentsUrl}/${encodeURIComponent(experimentId)}/posts`, {
     method: "POST",
     credentials: "include",
     headers: {
@@ -207,7 +207,7 @@ export async function linkPostToExperiment(
 export async function evaluateExperimentResults(
   experimentId: string,
 ): Promise<ExperimentResultData> {
-  const response = await fetch(`${experimentsUrl}/${encodeURIComponent(experimentId)}/results`, {
+  const response = await apiFetch(`${experimentsUrl}/${encodeURIComponent(experimentId)}/results`, {
     method: "POST",
     credentials: "include",
     headers: {

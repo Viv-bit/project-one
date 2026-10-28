@@ -1,4 +1,5 @@
 import {
+  apiFetch,
   apiUrl,
   youtubeConnectionUrl,
   youtubeSyncUrl,
@@ -67,7 +68,7 @@ export type AnalyzeYouTubeResult = {
 };
 
 export async function getYouTubeConnection(): Promise<YouTubeConnectionState> {
-  const response = await fetch(youtubeConnectionUrl, {
+  const response = await apiFetch(youtubeConnectionUrl, {
     method: "GET",
     credentials: "include",
     headers: {
@@ -87,7 +88,7 @@ export async function getYouTubeConnection(): Promise<YouTubeConnectionState> {
 }
 
 export async function disconnectYouTubeConnection(): Promise<{ message: string }> {
-  const response = await fetch(youtubeConnectionUrl, {
+  const response = await apiFetch(youtubeConnectionUrl, {
     method: "DELETE",
     credentials: "include",
     headers: {
@@ -133,7 +134,7 @@ export function formatCount(count: number | null | undefined): string {
 export async function syncYouTubeVideos(
   options?: SyncYouTubeOptions,
 ): Promise<SyncYouTubeResult> {
-  const response = await fetch(youtubeSyncUrl, {
+  const response = await apiFetch(youtubeSyncUrl, {
     method: "POST",
     credentials: "include",
     headers: {
@@ -161,7 +162,7 @@ export async function syncYouTubeVideos(
 export async function analyzeYouTubeVideos(
   options?: AnalyzeYouTubeOptions,
 ): Promise<AnalyzeYouTubeResult> {
-  const response = await fetch(youtubeAnalyzeUrl, {
+  const response = await apiFetch(youtubeAnalyzeUrl, {
     method: "POST",
     credentials: "include",
     headers: {
@@ -187,7 +188,7 @@ export async function analyzeYouTubeVideos(
  * Fetch all ingested user videos with latest metrics and AI features.
  */
 export async function getYouTubeVideos(): Promise<YouTubeVideoItem[]> {
-  const response = await fetch(youtubeVideosUrl, {
+  const response = await apiFetch(youtubeVideosUrl, {
     method: "GET",
     credentials: "include",
     headers: {

@@ -1,4 +1,4 @@
-import { insightsUrl, recommendationsUrl } from "./api";
+import { apiFetch, insightsUrl, recommendationsUrl } from "./api";
 
 export type InsightPriority = "HIGH" | "MEDIUM" | "EXPERIMENTAL";
 
@@ -64,7 +64,7 @@ export async function getInsights(filters?: {
   if (filters?.priority) url.searchParams.set("priority", filters.priority);
   if (filters?.category) url.searchParams.set("category", filters.category);
 
-  const response = await fetch(url.toString(), {
+  const response = await apiFetch(url.toString(), {
     method: "GET",
     credentials: "include",
     headers: {
@@ -90,7 +90,7 @@ export async function getInsights(filters?: {
 }
 
 export async function getRecommendations(): Promise<RecommendationsResponse> {
-  const response = await fetch(recommendationsUrl, {
+  const response = await apiFetch(recommendationsUrl, {
     method: "GET",
     credentials: "include",
     headers: {
@@ -118,7 +118,7 @@ export async function getRecommendations(): Promise<RecommendationsResponse> {
 export async function getRecommendationById(
   id: string,
 ): Promise<ApiRecommendation | null> {
-  const response = await fetch(`${recommendationsUrl}/${encodeURIComponent(id)}`, {
+  const response = await apiFetch(`${recommendationsUrl}/${encodeURIComponent(id)}`, {
     method: "GET",
     credentials: "include",
     headers: {

@@ -2,8 +2,39 @@
 
 import Link from "next/link";
 import { Icon } from "@/components/ui";
+import { startYouTubeOAuth } from "@/lib/youtube";
+import { useYouTubeConnection } from "@/lib/youtube-connection-context";
 
 export function ExperimentPendingCard() {
+  const { isConnected } = useYouTubeConnection();
+
+  if (!isConnected) {
+    return (
+      <div className="flex items-center justify-between rounded-2xl border border-dashed border-[#ded4c6] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition-all hover:border-brand/40">
+        <div className="flex items-center gap-3">
+          <div className="grid size-9 place-items-center rounded-xl bg-[#faf7f2] border border-[#ede5d8] text-[#8c8276]">
+            <Icon name="flask" className="size-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5 text-xs font-bold text-ink">
+              <span>Automated Tests</span>
+            </div>
+            <p className="text-[11px] text-[#7d7469]">
+              0 tests pending · Connect channel
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => startYouTubeOAuth()}
+          className="rounded-full bg-brand/10 px-2.5 py-1 text-[11px] font-bold text-brand hover:bg-brand/20 transition-colors"
+        >
+          Connect &rarr;
+        </button>
+      </div>
+    );
+  }
+
   return (
     <Link
       href="/dashboard/experiments"

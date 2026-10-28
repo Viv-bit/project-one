@@ -1,4 +1,5 @@
 import {
+  apiFetch,
   creatorUrl,
   creatorOverviewUrl,
   creatorContentUrl,
@@ -76,7 +77,7 @@ export type CreatorContentResponse = {
 };
 
 export async function getCreatorProfile(): Promise<CreatorProfileResponse> {
-  const response = await fetch(creatorUrl, {
+  const response = await apiFetch(creatorUrl, {
     method: "GET",
     credentials: "include",
     headers: {
@@ -94,7 +95,7 @@ export async function getCreatorProfile(): Promise<CreatorProfileResponse> {
 }
 
 export async function getCreatorOverview(): Promise<CreatorOverviewResponse> {
-  const response = await fetch(creatorOverviewUrl, {
+  const response = await apiFetch(creatorOverviewUrl, {
     method: "GET",
     credentials: "include",
     headers: {
@@ -112,7 +113,7 @@ export async function getCreatorOverview(): Promise<CreatorOverviewResponse> {
 }
 
 export async function getCreatorContent(): Promise<CreatorContentResponse> {
-  const response = await fetch(creatorContentUrl, {
+  const response = await apiFetch(creatorContentUrl, {
     method: "GET",
     credentials: "include",
     headers: {
