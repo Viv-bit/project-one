@@ -143,6 +143,9 @@ export type IngestedVideoPost = {
   thumbnailGradient: string;
   transcriptHookSnippet: string;
   audioExtracted: boolean;
+  first3SecondsTranscript?: string;
+  detectedChurnTriggers?: string[];
+  strategicPrescription?: string;
 };
 
 export type BenchmarkPeerCreator = {

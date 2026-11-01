@@ -10,36 +10,8 @@ import {
   formatCount,
   type YouTubeVideoItem,
 } from "@/lib/youtube";
-import { INGESTED_POSTS_16 } from "@/lib/data/intelligence-mock-data";
-
-function getSampleVideos(): YouTubeVideoItem[] {
-  return INGESTED_POSTS_16.map((p) => ({
-    id: p.id,
-    externalId: p.externalId,
-    title: p.title,
-    publishedAt: p.publishedAt,
-    durationSeconds: p.durationSeconds,
-    views: p.views,
-    metrics: [
-      {
-        views: p.views,
-        likes: p.likes,
-        comments: p.comments,
-      },
-    ],
-    features: {
-      topic: p.topicPillar,
-      pillar: "Tutorial / Breakdown",
-      hookType: p.hookType,
-      ctaType: p.ctaType,
-      tone: p.tone,
-      classifiedAt: new Date().toISOString(),
-    },
-  }));
-}
-
 export function YouTubeVideoIngestPanel() {
-  const [videos, setVideos] = useState<YouTubeVideoItem[]>(getSampleVideos);
+  const [videos, setVideos] = useState<YouTubeVideoItem[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [syncCount, setSyncCount] = useState<number>(20);
@@ -55,11 +27,11 @@ export function YouTubeVideoIngestPanel() {
     async function load() {
       try {
         const data = await getYouTubeVideos();
-        if (isMounted && data && data.length > 0) {
-          setVideos(data);
+        if (isMounted) {
+          setVideos(data || []);
         }
       } catch {
-        // Keep sample calibrated posts
+        if (isMounted) setVideos([]);
       }
     }
     load();
@@ -71,9 +43,7 @@ export function YouTubeVideoIngestPanel() {
   async function refreshVideos() {
     try {
       const data = await getYouTubeVideos();
-      if (data && data.length > 0) {
-        setVideos(data);
-      }
+      setVideos(data || []);
     } catch {
       // Keep existing
     }

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { Icon } from "@/components/ui";
-import { CHANNEL_PROFILE } from "@/lib/data/intelligence-mock-data";
 import { getCreatorProfile, type CreatorProfileResponse } from "@/lib/creator";
 import { formatCount, startYouTubeOAuth } from "@/lib/youtube";
 import { useYouTubeConnection } from "@/lib/youtube-connection-context";
@@ -30,7 +29,7 @@ export function ChannelHeader() {
           setProfileData(data);
         }
       } catch {
-        // Keep initial mock profile for connected state
+        // Retain context channel data if API fetch fails
       }
     }
     fetchProfile();
@@ -106,17 +105,17 @@ export function ChannelHeader() {
 
   // Connected state
   const activeChannel = profileData?.channel ?? channel;
-  const channelName = activeChannel?.title ?? CHANNEL_PROFILE.name;
+  const channelName = activeChannel?.title ?? "Connected YouTube Channel";
   const channelHandle = activeChannel?.handle
     ? (activeChannel.handle.startsWith("@") ? activeChannel.handle : `@${activeChannel.handle}`)
-    : CHANNEL_PROFILE.handle;
+    : "@creator";
   const subscribersText = activeChannel?.subscriberCount != null
     ? `${formatCount(activeChannel.subscriberCount)} Subscribers`
-    : CHANNEL_PROFILE.subscribers;
-  const nicheText = profileData?.profile?.inferredNiche ?? CHANNEL_PROFILE.niche;
-  const tierText = profileData?.profile?.audienceScaleTier ?? "Established (50K–500K)";
-  const coveragePct = profileData?.profile?.classificationCoveragePct ?? 100;
-  const totalAnalyzed = profileData?.profile?.totalVideosAnalyzed ?? activeChannel?.videoCount ?? 16;
+    : "Subscribers Connected";
+  const nicheText = profileData?.profile?.inferredNiche ?? "Creator Intelligence";
+  const tierText = profileData?.profile?.audienceScaleTier ?? "Audience Scale Tier";
+  const coveragePct = profileData?.profile?.classificationCoveragePct ?? 0;
+  const totalAnalyzed = profileData?.profile?.totalVideosAnalyzed ?? activeChannel?.videoCount ?? 0;
 
   function handleExport(format: "PDF" | "CSV") {
     setExportFeedback(`Exporting ${format} audit report...`);

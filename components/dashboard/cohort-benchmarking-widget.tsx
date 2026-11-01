@@ -1,16 +1,41 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui";
-import { COHORT_BENCHMARKS } from "@/lib/data/intelligence-mock-data";
+import { getCreatorBenchmark, type BenchmarkComparisonResult } from "@/lib/benchmarks";
 import { startYouTubeOAuth } from "@/lib/youtube";
 import { useYouTubeConnection } from "@/lib/youtube-connection-context";
 
 export function CohortBenchmarkingWidget() {
   const { isConnected } = useYouTubeConnection();
+  const [benchmarkData, setBenchmarkData] = useState<BenchmarkComparisonResult | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Empty state when YouTube is not connected
-  if (!isConnected) {
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchBenchmark() {
+      if (!isConnected) return;
+      setIsLoading(true);
+      try {
+        const data = await getCreatorBenchmark();
+        if (isMounted && data) {
+          setBenchmarkData(data);
+        }
+      } catch (err) {
+        console.warn("Failed to fetch cohort benchmark:", err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+    fetchBenchmark();
+    return () => {
+      isMounted = false;
+    };
+  }, [isConnected]);
+
+  // Empty state when YouTube is not connected OR when no upload history exists
+  if (!isConnected || !benchmarkData || !benchmarkData.hasData) {
     return (
       <div className="rounded-2xl border border-dashed border-[#ded4c6] bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] sm:p-6">
         {/* Header */}
@@ -22,26 +47,28 @@ export function CohortBenchmarkingWidget() {
             <h2 className="text-base font-semibold text-ink">Cohort Benchmarking</h2>
           </div>
           <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-            Tier Locked
+            {!isConnected ? "Connection Required" : "Awaiting Videos"}
           </span>
         </div>
 
         <p className="mt-2.5 text-xs text-[#786f65] leading-relaxed">
-          Peer comparisons against verified creator cohorts unlock once your subscriber scale is verified.
+          {!isConnected
+            ? "Peer comparisons against verified creator cohorts unlock once your YouTube channel is connected."
+            : "Calibrating against peer cohorts requires ingested video uploads to calculate comparative metrics."}
         </p>
 
         {/* Locked Cohort Preview Rows */}
         <div className="mt-4 space-y-3.5">
           {[
-            { metric: "0–3s Hook Retention", note: "Benchmark: ~74% median in tech cohort" },
-            { metric: "72h View Velocity", note: "Tier percentile calculation locked" },
-            { metric: "End-Card Click-Through", note: "Awaiting video catalog sync" },
+            { metric: "Median 72h View Velocity", note: "Cohort percentile calculation pending" },
+            { metric: "Audience Engagement Rate", note: "Awaiting video upload baseline" },
+            { metric: "Monthly Upload Cadence", note: "Sync channel to calculate publishing frequency" },
           ].map((item) => (
             <div key={item.metric} className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-medium text-[#7d7367]">{item.metric}</span>
                 <span className="text-[10px] font-medium text-[#9c9185] bg-[#f5efe6] px-1.5 py-0.5 rounded">
-                  Locked
+                  Pending
                 </span>
               </div>
 
@@ -58,18 +85,35 @@ export function CohortBenchmarkingWidget() {
         </div>
 
         {/* CTA Button */}
-        <button
-          onClick={() => startYouTubeOAuth()}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-[#ded4c6] bg-[#faf7f2] py-2 text-xs font-semibold text-[#5c5348] hover:bg-white hover:border-brand/40 transition-colors"
-        >
-          <Icon name="youtube" className="size-3.5 text-red-600" />
-          <span>Connect Channel to Unlock Cohorts</span>
-        </button>
+        {!isConnected ? (
+          <button
+            onClick={() => startYouTubeOAuth()}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-[#ded4c6] bg-[#faf7f2] py-2 text-xs font-semibold text-[#5c5348] hover:bg-white hover:border-brand/40 transition-colors"
+          >
+            <Icon name="youtube" className="size-3.5 text-red-600" />
+            <span>Connect Channel to Unlock Cohorts</span>
+          </button>
+        ) : (
+          <Link
+            href="/dashboard/youtube"
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-brand/30 bg-brand/5 py-2 text-xs font-semibold text-brand hover:bg-brand/10 transition-colors"
+          >
+            <Icon name="refresh-cw" className="size-3.5 text-brand" />
+            <span>Sync Videos in Integrations</span>
+          </Link>
+        )}
       </div>
     );
   }
 
-  // Connected state
+  // Connected state with real benchmark comparison
+  const { benchmarkGroup, comparativeMetrics } = benchmarkData;
+  const metrics = [
+    comparativeMetrics?.medianViews,
+    comparativeMetrics?.engagementRate,
+    comparativeMetrics?.monthlyPostFrequency,
+  ].filter(Boolean);
+
   return (
     <div className="rounded-2xl border border-[#e6e0d6] bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] sm:p-6">
       {/* Header */}
@@ -84,38 +128,61 @@ export function CohortBenchmarkingWidget() {
           href="/dashboard/benchmarks"
           className="rounded-full bg-[#f6f2ea] border border-[#e8e2d8] px-2 py-0.5 text-[10px] font-semibold text-brand hover:underline"
         >
-          18 Peers &rarr;
+          {benchmarkGroup?.sampleCreatorCount ?? 18} Peers &rarr;
         </Link>
       </div>
 
       <p className="mt-2.5 text-xs text-[#786f65] leading-relaxed">
-        Compared directly against 18 active verified creators in your 250k–500k subscriber tier.
+        Compared against verified creators in the <strong>{benchmarkGroup?.name ?? "peer cohort"}</strong>.
       </p>
 
       {/* Benchmark Rows */}
       <div className="mt-4 space-y-4">
-        {COHORT_BENCHMARKS.map((bench) => (
-          <div key={bench.id} className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-semibold text-ink">{bench.metricName}</span>
-              <span className="font-semibold text-brand text-[11px]">
-                {bench.percentileLabel}
-              </span>
-            </div>
+        {metrics.map((m, idx) => {
+          const isAbove = m.status === "ABOVE_BENCHMARK";
+          const isNeutral = m.status === "ON_PAR";
+          const progressPct = isAbove
+            ? Math.min(95, 50 + Math.abs(m.deltaPercent) / 2)
+            : isNeutral
+            ? 50
+            : Math.max(15, 50 - Math.abs(m.deltaPercent) / 2);
 
-            {/* Visual Comparative Progress Bar */}
-            <div className="h-2 w-full overflow-hidden rounded-full bg-[#ede7dd]">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-brand to-amber-500"
-                style={{ width: `${bench.progressPct}%` }}
-              />
-            </div>
+          return (
+            <div key={idx} className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-ink">{m.metric}</span>
+                <span
+                  className={`font-semibold text-[11px] ${
+                    isAbove ? "text-emerald-700" : isNeutral ? "text-[#7a7167]" : "text-brand"
+                  }`}
+                >
+                  {m.deltaPercent >= 0 ? `+${m.deltaPercent}%` : `${m.deltaPercent}%`} vs Cohort
+                </span>
+              </div>
 
-            <div className="flex items-center justify-between text-[11px] text-[#887f74]">
-              <span>{bench.note}</span>
+              {/* Visual Comparative Progress Bar */}
+              <div className="h-2 w-full overflow-hidden rounded-full bg-[#ede7dd]">
+                <div
+                  className={`h-full rounded-full transition-all duration-700 ${
+                    isAbove
+                      ? "bg-gradient-to-r from-emerald-500 to-teal-500"
+                      : "bg-gradient-to-r from-brand to-amber-500"
+                  }`}
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] text-[#887f74]">
+                <span>
+                  You: <strong>{typeof m.creatorValue === "number" ? m.creatorValue.toLocaleString() : m.creatorValue} {m.unit}</strong>
+                </span>
+                <span>
+                  Peer Median: <strong>{typeof m.benchmarkValue === "number" ? m.benchmarkValue.toLocaleString() : m.benchmarkValue} {m.unit}</strong>
+                </span>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

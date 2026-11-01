@@ -80,7 +80,7 @@ export const GROWTH_SPRINTS: GrowthSprint[] = [
         id: "c1-2",
         title: "Strict 6-Second Talking Head Rule",
         description:
-          "Never allow Nate Chen talking head footage to exceed 0:06 consecutive seconds without macro b-roll, motion graphic callout, or kinetic punch-in.",
+          "Never allow continuous talking head footage to exceed 0:06 consecutive seconds without macro b-roll, motion graphic callout, or kinetic punch-in.",
         completed: true,
         statusIcon: "checked",
       },

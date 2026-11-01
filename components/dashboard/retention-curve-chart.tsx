@@ -1,16 +1,44 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
 import type { RetentionFormat } from "@/lib/types/creator-intelligence";
 import { RETENTION_CURVE_DATA } from "@/lib/data/intelligence-mock-data";
 import { Icon } from "@/components/ui";
-import { startYouTubeOAuth } from "@/lib/youtube";
+import { startYouTubeOAuth, getYouTubeVideos } from "@/lib/youtube";
 import { useYouTubeConnection } from "@/lib/youtube-connection-context";
+
+const X_AXIS_TICKS = [
+  { sec: 0, label: "0:00", align: "start" },
+  { sec: 15, label: "0:15", align: "middle" },
+  { sec: 30, label: "0:30", align: "middle" },
+  { sec: 45, label: "0:45", align: "middle" },
+  { sec: 60, label: "1:00", align: "end" },
+] as const;
 
 export function RetentionCurveChart() {
   const { isConnected } = useYouTubeConnection();
+  const [hasVideos, setHasVideos] = useState<boolean | null>(null);
   const [selectedFormat, setSelectedFormat] = useState<RetentionFormat>("all");
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!isConnected) {
+      setHasVideos(false);
+      return;
+    }
+    let isMounted = true;
+    getYouTubeVideos()
+      .then((videos) => {
+        if (isMounted) setHasVideos(Array.isArray(videos) && videos.length > 0);
+      })
+      .catch(() => {
+        if (isMounted) setHasVideos(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [isConnected]);
 
   // SVG dimensions & coordinate calculations
   const width = 640;
@@ -66,8 +94,8 @@ export function RetentionCurveChart() {
   const thresholdX = getX(3);
   const activeHover = hoveredIndex !== null ? RETENTION_CURVE_DATA[hoveredIndex] : null;
 
-  // Empty state when YouTube is not connected
-  if (!isConnected) {
+  // Empty state when YouTube is not connected OR when user has no videos
+  if (!isConnected || hasVideos === false) {
     return (
       <div className="relative overflow-hidden rounded-2xl border border-dashed border-[#ded4c6] bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] sm:p-6">
         {/* Header & Disabled Format Toggle */}
@@ -78,7 +106,7 @@ export function RetentionCurveChart() {
                 Retention &amp; Hook Velocity Curve
               </h2>
               <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-                Awaiting Connection
+                {!isConnected ? "Awaiting Connection" : "Sync Required"}
               </span>
             </div>
             <p className="text-xs text-[#82786e]">
@@ -123,15 +151,15 @@ export function RetentionCurveChart() {
               strokeDasharray="6 6"
             />
             {/* Faint X-axis markers */}
-            {RETENTION_CURVE_DATA.map((d) => (
+            {X_AXIS_TICKS.map((t) => (
               <text
-                key={d.timeSec}
-                x={getX(d.timeSec)}
+                key={t.sec}
+                x={t.sec === 0 ? paddingX : t.sec === 60 ? width - paddingX : getX(t.sec)}
                 y={height - 6}
-                textAnchor="middle"
+                textAnchor={t.align}
                 className="text-[10px] font-mono fill-[#968d83]"
               >
-                {d.timeLabel}
+                {t.label}
               </text>
             ))}
           </svg>
@@ -143,19 +171,31 @@ export function RetentionCurveChart() {
             </div>
 
             <h3 className="mt-3 font-serif text-lg sm:text-xl font-medium text-ink">
-              Retention Diagnostics Unavailable
+              {!isConnected ? "Retention Diagnostics Unavailable" : "Upload Ingestion Required"}
             </h3>
             <p className="mt-1.5 max-w-md text-xs sm:text-[13px] text-[#70665b] leading-relaxed">
-              Connect your YouTube channel to analyze your first 3-second hook drop-off rates, benchmark against cohort curves, and identify where viewers churn.
+              {!isConnected
+                ? "Connect your YouTube channel to analyze your first 3-second hook drop-off rates, benchmark against cohort curves, and identify where viewers churn."
+                : "Ingest and analyze your channel videos in Integrations to calibrate retention drop-off rates against peer benchmarks."}
             </p>
 
-            <button
-              onClick={() => startYouTubeOAuth()}
-              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#e62117] px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-[#cc1810]"
-            >
-              <Icon name="youtube" className="size-4" />
-              <span>Connect YouTube Channel</span>
-            </button>
+            {!isConnected ? (
+              <button
+                onClick={() => startYouTubeOAuth()}
+                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#e62117] px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-[#cc1810]"
+              >
+                <Icon name="youtube" className="size-4" />
+                <span>Connect YouTube Channel</span>
+              </button>
+            ) : (
+              <Link
+                href="/dashboard/youtube"
+                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-brand-strong"
+              >
+                <Icon name="refresh-cw" className="size-3.5" />
+                <span>Sync Videos in Integrations</span>
+              </Link>
+            )}
           </div>
         </div>
 
@@ -285,7 +325,45 @@ export function RetentionCurveChart() {
             stroke="#e07c3a"
             strokeWidth="1.25"
             strokeDasharray="3 3"
-            opacity="0.6"
+            opacity="0.75"
+          />
+
+          {/* 0:03 Threshold Callout Pill at top of guide line */}
+          <g
+            transform={`translate(${thresholdX}, ${paddingY - 7})`}
+            className="cursor-pointer"
+            onMouseEnter={() => setHoveredIndex(1)}
+            onMouseLeave={() => setHoveredIndex(null)}
+          >
+            <rect
+              x="-38"
+              y="-12"
+              width="76"
+              height="16"
+              rx="8"
+              fill="#fff7ed"
+              stroke="#e07c3a"
+              strokeWidth="1"
+            />
+            <text
+              x="0"
+              y="-1"
+              textAnchor="middle"
+              className="text-[9.5px] font-mono font-bold fill-[#e07c3a]"
+            >
+              0:03 Threshold
+            </text>
+          </g>
+
+          {/* 0:03 Threshold bottom axis indicator notch */}
+          <line
+            x1={thresholdX}
+            y1={height - paddingY}
+            x2={thresholdX}
+            y2={height - paddingY + 4}
+            stroke="#e07c3a"
+            strokeWidth="1.5"
+            strokeLinecap="round"
           />
 
           {/* Benchmark line (dashed) */}
@@ -331,17 +409,15 @@ export function RetentionCurveChart() {
           })}
 
           {/* X Axis Time Labels */}
-          {RETENTION_CURVE_DATA.map((d) => (
+          {X_AXIS_TICKS.map((t) => (
             <text
-              key={d.timeSec}
-              x={getX(d.timeSec)}
+              key={t.sec}
+              x={t.sec === 0 ? paddingX : t.sec === 60 ? width - paddingX : getX(t.sec)}
               y={height - 6}
-              textAnchor="middle"
-              className={`text-[10px] font-mono ${
-                d.isThreshold ? "font-bold fill-brand" : "fill-[#968d83]"
-              }`}
+              textAnchor={t.align}
+              className="text-[10px] font-mono fill-[#968d83]"
             >
-              {d.timeLabel}
+              {t.label}
             </text>
           ))}
         </svg>

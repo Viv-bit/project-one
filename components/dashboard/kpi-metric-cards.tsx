@@ -1,33 +1,43 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Icon } from "@/components/ui";
-import { KPI_METRIC_CARDS } from "@/lib/data/intelligence-mock-data";
 import { getCreatorOverview, type CreatorOverviewResponse } from "@/lib/creator";
-import { formatCount } from "@/lib/youtube";
+import { formatCount, startYouTubeOAuth } from "@/lib/youtube";
 import { useYouTubeConnection } from "@/lib/youtube-connection-context";
 
 export function KpiMetricCards() {
   const { isConnected } = useYouTubeConnection();
   const [overview, setOverview] = useState<CreatorOverviewResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
     async function fetchOverview() {
       if (!isConnected) return;
+      setIsLoading(true);
       try {
         const data = await getCreatorOverview();
-        if (data && data.medians) {
+        if (isMounted && data && data.medians) {
           setOverview(data);
         }
-      } catch {
-        // Fall back to sample KPI cards for connected demo
+      } catch (err) {
+        console.warn("Failed to fetch creator overview:", err);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     }
     fetchOverview();
+    return () => {
+      isMounted = false;
+    };
   }, [isConnected]);
 
-  // Empty state for users without a connected channel
-  if (!isConnected) {
+  const hasVideos = Boolean(overview?.totals?.totalVideos && overview.totals.totalVideos > 0);
+
+  // Empty state for users without a connected channel OR without ingested videos
+  if (!isConnected || !hasVideos) {
     return (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {/* 1. Median View Velocity Empty State */}
@@ -46,17 +56,28 @@ export function KpiMetricCards() {
               —
             </span>
             <span className="inline-flex items-center rounded-full bg-[#f4ede3] text-[#7d7367] px-2 py-0.5 text-[11px] font-medium">
-              Awaiting Channel
+              {!isConnected ? "Awaiting Channel" : "Sync Required"}
             </span>
           </div>
 
           <div className="mt-3 pt-2.5 border-t border-[#f2ede4] flex items-center justify-between text-xs text-[#9c9185]">
-            <span>Requires upload history</span>
-            <span className="font-mono text-[11px] text-amber-700">0 views</span>
+            <span>{!isConnected ? "Requires YouTube link" : "0 videos synced"}</span>
+            {!isConnected ? (
+              <button
+                onClick={() => startYouTubeOAuth()}
+                className="font-medium text-brand hover:underline"
+              >
+                Connect
+              </button>
+            ) : (
+              <Link href="/dashboard/youtube" className="font-medium text-brand hover:underline">
+                Sync now
+              </Link>
+            )}
           </div>
         </div>
 
-        {/* 2. 0-3s Hook Hold Rate / Median Engagement Rate Empty State */}
+        {/* 2. Median Engagement Rate Empty State */}
         <div className="group relative flex flex-col justify-between rounded-2xl border border-dashed border-[#ded4c6] bg-white/70 p-5 shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-all hover:bg-white hover:border-brand/40">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] font-bold tracking-wider uppercase text-[#887f74]">
@@ -98,22 +119,17 @@ export function KpiMetricCards() {
               —
             </span>
             <span className="inline-flex items-center rounded-full bg-[#f4ede3] text-[#7d7367] px-2 py-0.5 text-[11px] font-medium">
-              No Data
+              Awaiting Ingestion
             </span>
           </div>
 
-          <div className="mt-3 pt-2.5 border-t border-[#f2ede4]">
-            <div className="flex items-center justify-between text-[11px] text-[#9c9185] mb-1">
-              <span>Cohort Standing</span>
-              <span className="font-medium text-[#7d7367]">Unranked</span>
-            </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#ede5d8]">
-              <div className="h-full rounded-full bg-[#c2b6a8]" style={{ width: "0%" }} />
-            </div>
+          <div className="mt-3 pt-2.5 border-t border-[#f2ede4] text-xs text-[#9c9185]">
+            <span>Cohort Standing: </span>
+            <span className="font-medium text-[#7d7367]">Locked</span>
           </div>
         </div>
 
-        {/* 4. Upload Cadence & Confidence Empty State */}
+        {/* 4. Upload Cadence Empty State */}
         <div className="group relative flex flex-col justify-between rounded-2xl border border-dashed border-[#ded4c6] bg-white/70 p-5 shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-all hover:bg-white hover:border-brand/40">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] font-bold tracking-wider uppercase text-[#887f74]">
@@ -129,7 +145,7 @@ export function KpiMetricCards() {
               —
             </span>
             <span className="inline-flex items-center rounded-full bg-[#f4ede3] text-[#7d7367] px-2 py-0.5 text-[11px] font-medium">
-              Pending Ingestion
+              Pending Sync
             </span>
           </div>
 
@@ -142,28 +158,22 @@ export function KpiMetricCards() {
     );
   }
 
-  // Connected state computation
-  const medianViews = overview?.medians?.views != null
-    ? formatCount(overview.medians.views)
-    : KPI_METRIC_CARDS[0].value;
-  const meanViews = overview?.medians?.meanViews != null
-    ? formatCount(overview.medians.meanViews)
-    : "48,200";
-  const engagementRate = overview?.medians?.engagementRate != null
-    ? `${overview.medians.engagementRate.toFixed(1)}%`
-    : KPI_METRIC_CARDS[1].value;
+  // Connected state computation from real overview
+  const medianViews = overview?.medians?.views != null ? formatCount(overview.medians.views) : "—";
+  const meanViews = overview?.medians?.meanViews != null ? formatCount(overview.medians.meanViews) : "—";
+  const engagementRate = overview?.medians?.engagementRate != null ? `${overview.medians.engagementRate.toFixed(1)}%` : "—";
   const viewsSubRatio = overview?.medians?.viewsPerSubscriberRatio != null
     ? `${(overview.medians.viewsPerSubscriberRatio * 100).toFixed(2)}%`
-    : KPI_METRIC_CARDS[2].value;
+    : "—";
   const top10Threshold = overview?.percentiles?.top10ThresholdViews != null
     ? formatCount(overview.percentiles.top10ThresholdViews)
-    : "112,000";
+    : "—";
   const postsPerWeek = overview?.cadence?.postsPerWeek != null
     ? `${overview.cadence.postsPerWeek.toFixed(1)}/wk`
-    : "1.2/wk";
+    : "—";
   const daysGap = overview?.cadence?.medianDaysBetweenUploads != null
     ? `${overview.cadence.medianDaysBetweenUploads}d`
-    : "6d";
+    : "—";
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -171,7 +181,7 @@ export function KpiMetricCards() {
       <div className="group relative flex flex-col justify-between rounded-2xl border border-[#e6e0d6] bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] transition-all hover:border-brand/40 hover:shadow-sm">
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] font-bold tracking-wider uppercase text-[#887f74]">
-            Median 72h View Velocity
+            Median View Velocity
           </span>
           <div className="grid size-7 place-items-center rounded-lg bg-[#faf7f2] border border-[#e8e2d8] text-[#7a7167] group-hover:text-brand">
             <Icon name="trending-up" className="size-3.5" />
@@ -183,13 +193,13 @@ export function KpiMetricCards() {
             {medianViews}
           </span>
           <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 text-[11px] font-semibold">
-            Median
+            {overview?.totals?.totalVideos ?? 0} Videos
           </span>
         </div>
 
         <div className="mt-3 pt-2.5 border-t border-[#f2ede4] flex items-center justify-between text-xs text-[#887f74]">
           <span>Mean Views: <strong className="text-ink font-semibold">{meanViews}</strong></span>
-          <span className="text-emerald-700 font-medium">Robust Outlier Fit</span>
+          <span className="text-emerald-700 font-medium">Verified Telemetry</span>
         </div>
       </div>
 
@@ -209,7 +219,7 @@ export function KpiMetricCards() {
             {engagementRate}
           </span>
           <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 text-[11px] font-semibold">
-            +13.4%
+            Empirical
           </span>
         </div>
 
@@ -235,17 +245,17 @@ export function KpiMetricCards() {
             {viewsSubRatio}
           </span>
           <span className="inline-flex items-center rounded-full bg-brand/10 text-brand border border-brand/20 px-2 py-0.5 text-[11px] font-semibold">
-            High Tier
+            Active Ratio
           </span>
         </div>
 
         <div className="mt-3 pt-2.5 border-t border-[#f2ede4]">
           <div className="flex items-center justify-between text-[11px] text-[#887f74] mb-1">
-            <span>Cohort Standing</span>
-            <span className="font-semibold text-brand">Top 15% Niche</span>
+            <span>Audience Leverage</span>
+            <span className="font-semibold text-brand">Calculated</span>
           </div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#f0ebd2]/60">
-            <div className="h-full rounded-full bg-brand" style={{ width: "84%" }} />
+            <div className="h-full rounded-full bg-brand" style={{ width: "65%" }} />
           </div>
         </div>
       </div>
@@ -272,7 +282,7 @@ export function KpiMetricCards() {
 
         <div className="mt-3 pt-2.5 border-t border-[#f2ede4] flex items-center gap-1.5 text-xs text-[#887f74]">
           <Icon name="check-circle" className="size-3.5 text-brand" />
-          <span>Deterministic Analytics Calibrated</span>
+          <span>Real Channel Analytics</span>
         </div>
       </div>
     </div>

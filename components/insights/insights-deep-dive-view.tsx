@@ -1,11 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Icon } from "@/components/ui/icon";
-import {
-  DETAILED_INSIGHTS,
-  INGESTED_POSTS_16,
-} from "@/lib/data/intelligence-mock-data";
 import type { DetailedInsight } from "@/lib/types/creator-intelligence";
 import { CreateExperimentModal } from "@/components/dashboard/create-experiment-modal";
 import {
@@ -15,6 +12,7 @@ import {
   type ApiRecommendation,
   type InsightPriority,
 } from "@/lib/insights";
+import { getYouTubeVideos, type YouTubeVideoItem, formatCount } from "@/lib/youtube";
 
 type FilterPriority = "ALL" | InsightPriority;
 type FilterCategory =
@@ -27,30 +25,37 @@ type FilterCategory =
   | "CADENCE";
 
 export function InsightsDeepDiveView() {
-  const [insights, setInsights] = useState<DetailedInsight[]>(DETAILED_INSIGHTS);
+  const [insights, setInsights] = useState<DetailedInsight[]>([]);
+  const [userVideos, setUserVideos] = useState<YouTubeVideoItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedInsightForExp, setSelectedInsightForExp] =
     useState<DetailedInsight | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [expandedInsightId, setExpandedInsightId] = useState<string | null>(
-    "ins-01"
-  );
+  const [expandedInsightId, setExpandedInsightId] = useState<string | null>(null);
   const [priorityFilter, setPriorityFilter] = useState<FilterPriority>("ALL");
   const [categoryFilter, setCategoryFilter] = useState<FilterCategory>("ALL");
 
   useEffect(() => {
     let ignore = false;
     async function load() {
+      setIsLoading(true);
       try {
-        const [insightsRes, recsRes] = await Promise.allSettled([
+        const [insightsRes, recsRes, videosRes] = await Promise.allSettled([
           getInsights({
             ...(priorityFilter !== "ALL" && { priority: priorityFilter }),
             ...(categoryFilter !== "ALL" && { category: categoryFilter }),
           }),
           getRecommendations(),
+          getYouTubeVideos(),
         ]);
 
         if (ignore) return;
-        if (insightsRes.status === "fulfilled" && insightsRes.value?.insights?.length > 0) {
+
+        if (videosRes.status === "fulfilled" && Array.isArray(videosRes.value)) {
+          setUserVideos(videosRes.value);
+        }
+
+        if (insightsRes.status === "fulfilled" && insightsRes.value?.insights) {
           const recsList: ApiRecommendation[] =
             recsRes.status === "fulfilled" && recsRes.value?.recommendations
               ? recsRes.value.recommendations
@@ -95,12 +100,15 @@ export function InsightsDeepDiveView() {
             };
           });
 
-          if (!ignore) {
-            setInsights(mapped);
+          setInsights(mapped);
+          if (mapped.length > 0 && !expandedInsightId) {
+            setExpandedInsightId(mapped[0].id);
           }
         }
-      } catch {
-        // Fallback to sample calibrated insights
+      } catch (err) {
+        console.warn("Failed to load insights:", err);
+      } finally {
+        if (!ignore) setIsLoading(false);
       }
     }
 
@@ -141,68 +149,85 @@ export function InsightsDeepDiveView() {
             </p>
           </div>
 
-          <div className="rounded-xl border border-[#e6e0d6] bg-[#faf7f2] p-3 text-xs">
-            <span className="text-muted block text-[11px]">Core Mandate</span>
-            <span className="font-semibold text-ink">
-              Deterministic Code Calculates · LLM Interprets
-            </span>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/dashboard/experiments"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#e6e0d6] bg-[#faf7f2] px-4 py-2 text-xs font-semibold text-ink hover:bg-white transition-colors"
+            >
+              <Icon name="flask" className="size-3.5" />
+              <span>Experiment Backlog</span>
+            </Link>
           </div>
         </div>
 
-        {/* Priority & Category Filter Bars */}
-        <div className="mt-6 flex flex-wrap items-center gap-3 pt-5 border-t border-[#f0ebe1]">
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-muted font-semibold text-[11px] mr-1">Priority:</span>
-            {(["ALL", "HIGH", "MEDIUM", "EXPERIMENTAL"] as const).map((p) => (
-              <button
-                key={p}
-                onClick={() => setPriorityFilter(p)}
-                className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                  priorityFilter === p
-                    ? "bg-ink text-white"
-                    : "bg-[#faf7f2] border border-[#e8e2d8] text-muted hover:text-ink"
-                }`}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-
-          <div className="hidden sm:block h-4 w-px bg-line" />
-
-          <div className="flex flex-wrap items-center gap-1.5 text-xs">
-            <span className="text-muted font-semibold text-[11px] mr-1">Category:</span>
-            {(
-              [
-                { id: "ALL", label: "All Rules" },
-                { id: "TOPIC_OPPORTUNITY", label: "Topic Opportunity" },
-                { id: "HOOK_LEVERAGE", label: "Hook Leverage" },
-                { id: "DURATION_SWEET_SPOT", label: "Duration Sweet Spot" },
-                { id: "ENGAGEMENT_CLUSTER", label: "Engagement Cluster" },
-                { id: "CADENCE", label: "Upload Cadence" },
-              ] as const
-            ).map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setCategoryFilter(c.id as FilterCategory)}
-                className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                  categoryFilter === c.id
-                    ? "bg-brand text-white"
-                    : "bg-[#faf7f2] border border-[#e8e2d8] text-muted hover:text-ink"
-                }`}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
+        {/* Priority Filter Badges */}
+        <div className="mt-6 flex flex-wrap items-center gap-2 pt-4 border-t border-[#f0ebe1]">
+          <span className="text-xs font-bold text-muted mr-1">Priority Filter:</span>
+          {(
+            [
+              { id: "ALL", label: "All Insights" },
+              { id: "HIGH", label: "High Priority" },
+              { id: "MEDIUM", label: "Medium Priority" },
+              { id: "EXPERIMENTAL", label: "Experimental" },
+            ] as const
+          ).map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setPriorityFilter(item.id)}
+              className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+                priorityFilter === item.id
+                  ? "bg-brand text-white shadow-xs"
+                  : "bg-[#faf7f2] border border-[#e8e2d8] text-muted hover:text-ink hover:bg-white"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
         </div>
       </div>
+
+      {/* Empty State */}
+      {filteredInsights.length === 0 && !isLoading && (
+        <div className="rounded-2xl border border-dashed border-[#ded4c6] bg-white p-12 text-center shadow-sm">
+          <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-[#faf7f2] border border-[#e8e2d8] text-brand shadow-sm">
+            <Icon name="brain" className="size-6" />
+          </div>
+
+          <h3 className="mt-3 font-serif text-xl font-medium text-ink">
+            {priorityFilter === "ALL"
+              ? "No Evidence-Backed Insights Yet"
+              : `No ${priorityFilter.toLowerCase()} Priority Insights`}
+          </h3>
+
+          <p className="mt-1.5 text-xs text-muted max-w-md mx-auto leading-relaxed">
+            {priorityFilter === "ALL"
+              ? "Insights are generated through statistical regressions across your video uploads. Sync your channel and run Gemini AI classification to uncover data-backed opportunities."
+              : `There are currently no insights tagged with ${priorityFilter.toLowerCase()} priority.`}
+          </p>
+
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+            <Link
+              href="/dashboard/youtube"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white shadow hover:bg-brand-strong"
+            >
+              <Icon name="refresh-cw" className="size-3.5" />
+              <span>Sync &amp; Analyze Videos</span>
+            </Link>
+            <Link
+              href="/onboarding"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#ded4c6] bg-[#faf7f2] px-4 py-2 text-xs font-semibold text-ink hover:bg-white"
+            >
+              <span>View Ingestion Pipeline</span>
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Insight Cards (4-Field Structure) */}
       <div className="space-y-6">
         {filteredInsights.map((insight, idx) => {
           const isExpanded = expandedInsightId === insight.id;
-          const linkedPosts = INGESTED_POSTS_16.filter((p) =>
+          const linkedPosts = userVideos.filter((p) =>
             insight.linkedPostIds.includes(p.id) || insight.linkedPostIds.includes(p.externalId)
           );
 
@@ -279,23 +304,25 @@ export function InsightsDeepDiveView() {
                       {insight.evidenceBenchmarkValue}
                     </span>
                   </div>
-                  <p className="text-[11px] text-muted">{insight.sampleSizeLabel}</p>
+                  <p className="text-[11px] text-muted italic">
+                    {insight.sampleSizeLabel}
+                  </p>
                 </div>
 
                 {/* 3. Action */}
-                <div className="rounded-xl border border-[#f0ebe1] bg-white p-4 space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-ink font-semibold">
-                    🎯 3. Prescriptive Action Item
+                <div className="rounded-xl border border-[#f0ebe1] bg-[#faf7f2] p-4 space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-brand">
+                    🎯 3. Prescribed Action
                   </span>
-                  <p className="text-ink leading-relaxed font-medium">
+                  <p className="text-ink leading-relaxed font-semibold">
                     {insight.recommendation}
                   </p>
                 </div>
 
-                {/* 4. Measurement / Interpretation */}
-                <div className="rounded-xl border border-[#f0ebe1] bg-white p-4 space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted">
-                    📏 4. Measurement &amp; Psychology
+                {/* 4. Measurement / Hypothesis */}
+                <div className="rounded-xl border border-[#f0ebe1] bg-[#faf7f2] p-4 space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-brand">
+                    📐 4. Measurement &amp; Algorithmic Rationale
                   </span>
                   <p className="text-muted leading-relaxed">
                     {insight.interpretation}
@@ -332,9 +359,9 @@ export function InsightsDeepDiveView() {
                         >
                           <div>
                             <div className="flex items-center justify-between text-[10px] text-muted font-mono">
-                              <span>{post.durationFormatted}</span>
+                              <span>{post.publishedAt.slice(0, 10)}</span>
                               <span className="font-bold text-ink">
-                                {post.hookHoldPct}% Hold
+                                {formatCount(post.views ?? post.metrics?.[0]?.views ?? 0)} views
                               </span>
                             </div>
                             <p className="mt-1 font-semibold text-ink line-clamp-1">
@@ -342,8 +369,8 @@ export function InsightsDeepDiveView() {
                             </p>
                           </div>
                           <div className="mt-2 flex items-center justify-between text-[10px] text-muted">
-                            <span>{post.hookType}</span>
-                            <span>{post.viewsFormatted} views</span>
+                            <span>{post.features?.hookType || "Classified"}</span>
+                            <span>{post.features?.topic || "Video"}</span>
                           </div>
                         </div>
                       ))}

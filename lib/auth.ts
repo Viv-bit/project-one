@@ -2,15 +2,18 @@ import {
   authSigninUrl,
   authSignupUrl,
   authLogoutUrl,
+  authMeUrl,
   googleAuthUrl,
   logoutUser,
   handleAuthError,
   apiFetch,
   type AuthSuccessResponse,
   type AuthValidationErrorResponse,
+  type AuthUser,
 } from "./api";
 
-export { authLogoutUrl, logoutUser, handleAuthError, apiFetch };
+export { authLogoutUrl, authMeUrl, logoutUser, handleAuthError, apiFetch };
+export type { AuthUser };
 
 export class AuthApiError extends Error {
   status: number;
@@ -108,3 +111,31 @@ export async function signinUser(
 export function startGoogleOAuth(): void {
   window.location.href = googleAuthUrl;
 }
+
+/**
+ * Fetch current authenticated user session details from GET /api/auth/me.
+ * Returns null if not authenticated or request fails.
+ */
+export async function getCurrentUser(): Promise<AuthUser | null> {
+  try {
+    const res = await apiFetch(authMeUrl, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+      },
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      return null;
+    }
+
+    const data = await res.json();
+    if (data?.user) return data.user as AuthUser;
+    if (data?.email) return data as AuthUser;
+    return null;
+  } catch {
+    return null;
+  }
+}
+

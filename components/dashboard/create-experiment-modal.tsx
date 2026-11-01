@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Icon } from "@/components/ui/icon";
-import { DETAILED_INSIGHTS } from "@/lib/data/intelligence-mock-data";
 import type { DetailedInsight } from "@/lib/types/creator-intelligence";
 import { createExperiment, type ExperimentCategory } from "@/lib/experiments";
+import { getRecommendations, type ApiRecommendation } from "@/lib/insights";
 
 type CreateExperimentModalProps = {
   isOpen: boolean;
@@ -26,6 +26,7 @@ export function CreateExperimentModal({
   preselectedInsight,
   onExperimentCreated,
 }: CreateExperimentModalProps) {
+  const [recommendations, setRecommendations] = useState<ApiRecommendation[]>([]);
   const [title, setTitle] = useState(
     preselectedInsight
       ? `Test: ${preselectedInsight.suggestedExperiment?.hypothesis?.slice(0, 50) ?? preselectedInsight.title}...`
@@ -33,7 +34,7 @@ export function CreateExperimentModal({
   );
   const [hypothesis, setHypothesis] = useState(
     preselectedInsight?.suggestedExperiment?.hypothesis ??
-      "Opening with the exact dollar amount wasted or failure point in the first 2s will lift 0-3s retention above 80%."
+      "Opening with the exact failure point or target outcome in the first 3s will lift retention hold."
   );
   const [category, setCategory] = useState<ExperimentCategory>(() => {
     if (preselectedInsight?.category === "hook") return "HOOK";
@@ -50,23 +51,54 @@ export function CreateExperimentModal({
     preselectedInsight?.suggestedExperiment?.suggestedDurationDays ?? 14
   );
   const [selectedInsightId, setSelectedInsightId] = useState<string>(
-    preselectedInsight?.id ?? "ins-01"
+    preselectedInsight?.id ?? "custom"
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    let isMounted = true;
+    async function load() {
+      try {
+        const data = await getRecommendations();
+        if (isMounted && data && Array.isArray(data.recommendations)) {
+          setRecommendations(data.recommendations);
+        }
+      } catch (err) {
+        console.warn("Failed to load recommendations for modal:", err);
+      }
+    }
+    load();
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   function handleInsightChange(insightId: string) {
     setSelectedInsightId(insightId);
-    const found = DETAILED_INSIGHTS.find((i) => i.id === insightId);
-    if (found?.suggestedExperiment) {
-      setTitle(`Test: ${found.title.slice(0, 55)}...`);
-      setHypothesis(found.suggestedExperiment.hypothesis);
-      setPrimaryMetric(found.suggestedExperiment.primaryMetric);
-      setTargetPostCount(found.suggestedExperiment.targetPostCount);
-      setDurationDays(found.suggestedExperiment.suggestedDurationDays);
+    if (insightId === "custom") {
+      setTitle("Custom Empirical Experiment");
+      setHypothesis("");
+      return;
+    }
+
+    const found = recommendations.find((r) => r.id === insightId);
+    if (found) {
+      setTitle(`Test: ${found.title.slice(0, 50)}...`);
+      setHypothesis(found.experimentTemplate?.hypothesis || found.action);
+      if (found.experimentTemplate?.primaryMetric) {
+        setPrimaryMetric(found.experimentTemplate.primaryMetric);
+      }
+      if (found.experimentTemplate?.targetPostCount) {
+        setTargetPostCount(found.experimentTemplate.targetPostCount);
+      }
+      if (found.experimentTemplate?.suggestedDurationDays) {
+        setDurationDays(found.experimentTemplate.suggestedDurationDays);
+      }
     }
   }
 
@@ -76,7 +108,6 @@ export function CreateExperimentModal({
     setErrorMsg(null);
 
     try {
-      // Send POST /api/experiments to backend
       const created = await createExperiment({
         title,
         hypothesis,
@@ -84,9 +115,8 @@ export function CreateExperimentModal({
         primaryMetric,
         targetPostCount,
         durationDays,
-        recommendationId: selectedInsightId,
+        recommendationId: selectedInsightId !== "custom" ? selectedInsightId : undefined,
       }).catch((err) => {
-        // If unauthenticated or backend offline, fallback gracefully
         console.warn("Backend create experiment fallback:", err);
         return null;
       });
@@ -158,7 +188,7 @@ export function CreateExperimentModal({
               </div>
             )}
 
-            {/* Link to Evidence Insight */}
+            {/* Link to Evidence Insight / Recommendation */}
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
                 Ground in Calibrated Opportunity
@@ -168,9 +198,10 @@ export function CreateExperimentModal({
                 onChange={(e) => handleInsightChange(e.target.value)}
                 className="w-full rounded-xl border border-[#ded6c7] bg-[#faf7f2] px-3.5 py-2 text-xs text-ink focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
               >
-                {DETAILED_INSIGHTS.map((insight) => (
-                  <option key={insight.id} value={insight.id}>
-                    {insight.title} ({insight.confidenceScore}% confidence)
+                <option value="custom">-- Custom Empirical Hypothesis --</option>
+                {recommendations.map((rec) => (
+                  <option key={rec.id} value={rec.id}>
+                    {rec.title} ({Math.round(rec.confidence * 100)}% confidence)
                   </option>
                 ))}
               </select>
@@ -187,7 +218,7 @@ export function CreateExperimentModal({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className="w-full rounded-xl border border-[#ded6c7] bg-white px-3.5 py-2 text-xs text-ink focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
-                placeholder="e.g. Scale Content on Next.js Architecture"
+                placeholder="e.g. Test Problem-First Opening vs Teaser"
               />
             </div>
 

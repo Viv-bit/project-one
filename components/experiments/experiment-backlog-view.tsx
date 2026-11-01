@@ -2,10 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { Icon } from "@/components/ui/icon";
-import {
-  EXPERIMENT_RECORDS,
-  INGESTED_POSTS_16,
-} from "@/lib/data/intelligence-mock-data";
 import type { ExperimentRecord } from "@/lib/types/creator-intelligence";
 import { CreateExperimentModal } from "@/components/dashboard/create-experiment-modal";
 import {
@@ -16,9 +12,12 @@ import {
   type ApiExperiment,
   type ExperimentStatus,
 } from "@/lib/experiments";
+import { getYouTubeVideos, type YouTubeVideoItem, formatCount } from "@/lib/youtube";
 
 export function ExperimentBacklogView() {
-  const [experiments, setExperiments] = useState<ExperimentRecord[]>(EXPERIMENT_RECORDS);
+  const [experiments, setExperiments] = useState<ExperimentRecord[]>([]);
+  const [userVideos, setUserVideos] = useState<YouTubeVideoItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "validated" | "inconclusive">("all");
   const [evaluatingId, setEvaluatingId] = useState<string | null>(null);
@@ -29,68 +28,78 @@ export function ExperimentBacklogView() {
   useEffect(() => {
     let isMounted = true;
     async function load() {
+      setIsLoading(true);
       try {
-        const data = await getExperiments();
-        if (!isMounted || !data || data.length === 0) return;
+        const [data, videos] = await Promise.all([
+          getExperiments().catch(() => []),
+          getYouTubeVideos().catch(() => []),
+        ]);
 
-        // Map ApiExperiment into ExperimentRecord
-        const mapped: ExperimentRecord[] = data.map((exp: ApiExperiment, idx: number) => {
-          const currentCount = exp.posts?.length ?? exp.progress?.currentPostsCount ?? 0;
-          const targetCount = exp.targetPostCount ?? 3;
-          const isSuff = currentCount >= targetCount;
-          const liftVal = exp.result?.deltaPercent ?? exp.liftPct ?? 0;
-          const isPos = liftVal > 0;
+        if (!isMounted) return;
 
-          let status: ExperimentRecord["status"] = "active";
-          if (exp.result) {
-            status = exp.result.conclusion === "POSITIVE" ? "validated" : "inconclusive";
-          } else if (exp.status === "COMPLETED") {
-            status = isPos ? "validated" : "inconclusive";
-          }
+        if (Array.isArray(videos)) {
+          setUserVideos(videos);
+        }
 
-          return {
-            id: exp.id,
-            experimentNumber: idx + 1,
-            title: exp.title,
-            hypothesis: exp.hypothesis,
-            status,
-            primaryMetric: exp.primaryMetric === "median_views" ? "Median Views" : "Engagement Rate",
-            baselineValueFormatted: exp.baselineMetricValue
-              ? exp.primaryMetric === "engagement_rate"
-                ? `${exp.baselineMetricValue.toFixed(1)}%`
-                : `${Math.round(exp.baselineMetricValue).toLocaleString()} views`
-              : "74.2%",
-            currentValueFormatted: exp.result?.experimentValue
-              ? exp.primaryMetric === "engagement_rate"
-                ? `${exp.result.experimentValue.toFixed(1)}%`
-                : `${Math.round(exp.result.experimentValue).toLocaleString()} views`
-              : currentCount === 0
-              ? "Pending 1st Upload"
-              : `${currentCount} Uploads Tracked`,
-            liftPctFormatted: exp.result
-              ? `${exp.result.deltaPercent >= 0 ? "+" : ""}${exp.result.deltaPercent.toFixed(1)}%`
-              : currentCount >= targetCount
-              ? "Ready for Evaluation"
-              : "0.0%",
-            targetPostCount: targetCount,
-            currentPostCount: currentCount,
-            durationDays: exp.durationDays ?? 14,
-            daysElapsed: exp.progress?.daysElapsed ?? 1,
-            startDate: exp.startDate ? exp.startDate.slice(0, 10) : "Today",
-            linkedPostIds: exp.posts?.map((p) => p.postId) ?? [],
-            notes: exp.result?.summary ?? (
-              isSuff
-                ? "Data Sufficiency Rule met! Ready to evaluate empirical outcome."
-                : `Awaiting ${targetCount - currentCount} more upload(s) to satisfy Data Sufficiency Rule (N>=${targetCount}).`
-            ),
-          };
-        });
+        if (Array.isArray(data)) {
+          const mapped: ExperimentRecord[] = data.map((exp: ApiExperiment, idx: number) => {
+            const currentCount = exp.posts?.length ?? exp.progress?.currentPostsCount ?? 0;
+            const targetCount = exp.targetPostCount ?? 3;
+            const isSuff = currentCount >= targetCount;
+            const liftVal = exp.result?.deltaPercent ?? exp.liftPct ?? 0;
+            const isPos = liftVal > 0;
 
-        if (isMounted) {
+            let status: ExperimentRecord["status"] = "active";
+            if (exp.result) {
+              status = exp.result.conclusion === "POSITIVE" ? "validated" : "inconclusive";
+            } else if (exp.status === "COMPLETED") {
+              status = isPos ? "validated" : "inconclusive";
+            }
+
+            return {
+              id: exp.id,
+              experimentNumber: idx + 1,
+              title: exp.title,
+              hypothesis: exp.hypothesis,
+              status,
+              primaryMetric: exp.primaryMetric === "median_views" ? "Median Views" : "Engagement Rate",
+              baselineValueFormatted: exp.baselineMetricValue
+                ? exp.primaryMetric === "engagement_rate"
+                  ? `${exp.baselineMetricValue.toFixed(1)}%`
+                  : `${Math.round(exp.baselineMetricValue).toLocaleString()} views`
+                : "Baseline Calibrated",
+              currentValueFormatted: exp.result?.experimentValue
+                ? exp.primaryMetric === "engagement_rate"
+                  ? `${exp.result.experimentValue.toFixed(1)}%`
+                  : `${Math.round(exp.result.experimentValue).toLocaleString()} views`
+                : currentCount === 0
+                ? "Pending 1st Upload"
+                : `${currentCount} Uploads Tracked`,
+              liftPctFormatted: exp.result
+                ? `${exp.result.deltaPercent >= 0 ? "+" : ""}${exp.result.deltaPercent.toFixed(1)}%`
+                : currentCount >= targetCount
+                ? "Ready for Evaluation"
+                : "0.0%",
+              targetPostCount: targetCount,
+              currentPostCount: currentCount,
+              durationDays: exp.durationDays ?? 14,
+              daysElapsed: exp.progress?.daysElapsed ?? 1,
+              startDate: exp.startDate ? exp.startDate.slice(0, 10) : "Today",
+              linkedPostIds: exp.posts?.map((p) => p.postId) ?? [],
+              notes: exp.result?.summary ?? (
+                isSuff
+                  ? "Data Sufficiency Rule met! Ready to evaluate empirical outcome."
+                  : `Awaiting ${targetCount - currentCount} more upload(s) to satisfy Data Sufficiency Rule (N>=${targetCount}).`
+              ),
+            };
+          });
+
           setExperiments(mapped);
         }
-      } catch {
-        // Keep sample experiment records
+      } catch (err) {
+        console.warn("Failed to load experiments:", err);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     }
 
@@ -104,20 +113,7 @@ export function ExperimentBacklogView() {
     try {
       setEvaluatingId(expId);
       setActionFeedback("Evaluating experiment results against channel baseline...");
-      const result = await evaluateExperimentResults(expId).catch((err) => {
-        console.warn("Evaluate fallback:", err);
-        return {
-          id: "res-demo",
-          baselineValue: 42000,
-          experimentValue: 56500,
-          deltaPercent: 34.5,
-          sampleSize: 3,
-          isDataSufficient: true,
-          conclusion: "POSITIVE" as const,
-          summary: "Hypothesis validated: 34.5% lift over channel baseline verified across 3 uploads.",
-          evaluatedAt: new Date().toISOString(),
-        };
-      });
+      const result = await evaluateExperimentResults(expId);
 
       setActionFeedback(
         `Evaluation complete: ${result.conclusion} (${result.deltaPercent >= 0 ? "+" : ""}${result.deltaPercent.toFixed(1)}% lift)!`
@@ -143,6 +139,7 @@ export function ExperimentBacklogView() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Evaluation failed";
       setActionFeedback(`Error: ${msg}`);
+      setTimeout(() => setActionFeedback(null), 4000);
     } finally {
       setEvaluatingId(null);
     }
@@ -150,10 +147,7 @@ export function ExperimentBacklogView() {
 
   async function handleStatusChange(expId: string, newStatus: ExperimentStatus) {
     try {
-      await updateExperiment(expId, { status: newStatus }).catch((err) => {
-        console.warn("Update status fallback:", err);
-      });
-
+      await updateExperiment(expId, { status: newStatus });
       setExperiments((prev) =>
         prev.map((e) => {
           if (e.id === expId) {
@@ -165,12 +159,8 @@ export function ExperimentBacklogView() {
           return e;
         })
       );
-
-      setActionFeedback(`Experiment status updated to ${newStatus}`);
-      setTimeout(() => setActionFeedback(null), 3000);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to update status";
-      setActionFeedback(`Error: ${msg}`);
+    } catch (err) {
+      console.warn("Update status error:", err);
     }
   }
 
@@ -178,21 +168,19 @@ export function ExperimentBacklogView() {
     if (!linkingExperimentId || !selectedPostToLink) return;
 
     try {
-      setActionFeedback("Linking uploaded video to experiment cohort...");
-      await linkPostToExperiment(linkingExperimentId, selectedPostToLink).catch((err) => {
-        console.warn("Link post fallback:", err);
-      });
+      setActionFeedback("Attaching video to experiment cohort...");
+      await linkPostToExperiment(linkingExperimentId, selectedPostToLink);
 
       setExperiments((prev) =>
         prev.map((e) => {
           if (e.id === linkingExperimentId) {
-            const nextPostIds = Array.from(new Set([...e.linkedPostIds, selectedPostToLink]));
-            const nextCount = nextPostIds.length;
+            const nextCount = e.currentPostCount + 1;
+            const isSuff = nextCount >= e.targetPostCount;
             return {
               ...e,
-              linkedPostIds: nextPostIds,
               currentPostCount: nextCount,
-              notes: nextCount >= e.targetPostCount
+              linkedPostIds: [...e.linkedPostIds, selectedPostToLink],
+              notes: isSuff
                 ? "Data Sufficiency Rule met! Ready to evaluate empirical outcome."
                 : `Awaiting ${e.targetPostCount - nextCount} more upload(s) to satisfy Data Sufficiency Rule.`,
             };
@@ -201,13 +189,14 @@ export function ExperimentBacklogView() {
         })
       );
 
-      setActionFeedback("Video successfully linked to experiment cohort!");
+      setActionFeedback("Video linked successfully!");
       setLinkingExperimentId(null);
       setSelectedPostToLink("");
       setTimeout(() => setActionFeedback(null), 3500);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to link post";
+      const msg = err instanceof Error ? err.message : "Failed to link video";
       setActionFeedback(`Error: ${msg}`);
+      setTimeout(() => setActionFeedback(null), 4000);
     }
   }
 
@@ -219,134 +208,164 @@ export function ExperimentBacklogView() {
     targetPostCount: number;
     durationDays: number;
   }) {
-    const createdRecord: ExperimentRecord = {
-      id: newExp.id || `exp-${Date.now()}`,
+    const newRecord: ExperimentRecord = {
+      id: newExp.id || `exp-local-${Date.now()}`,
       experimentNumber: experiments.length + 1,
       title: newExp.title,
       hypothesis: newExp.hypothesis,
       status: "active",
-      primaryMetric: newExp.primaryMetric === "engagement_rate" ? "Engagement Rate" : "Median Views",
-      baselineValueFormatted: "42,000 views",
+      primaryMetric: newExp.primaryMetric === "median_views" ? "Median Views" : "Engagement Rate",
+      baselineValueFormatted: "Baseline Calibrated",
       currentValueFormatted: "Pending 1st Upload",
       liftPctFormatted: "0.0%",
       targetPostCount: newExp.targetPostCount,
       currentPostCount: 0,
       durationDays: newExp.durationDays,
       daysElapsed: 1,
-      startDate: "Today",
+      startDate: new Date().toISOString().slice(0, 10),
       linkedPostIds: [],
-      notes: `Awaiting initial uploads to satisfy Data Sufficiency Rule (N>=${newExp.targetPostCount}).`,
+      notes: `Awaiting ${newExp.targetPostCount} upload(s) to satisfy Data Sufficiency Rule.`,
     };
 
-    setExperiments([createdRecord, ...experiments]);
+    setExperiments((prev) => [newRecord, ...prev]);
+    setActionFeedback("New experiment cohort created successfully!");
+    setTimeout(() => setActionFeedback(null), 3500);
   }
 
-  const filteredExperiments = experiments.filter(
-    (exp) => filterStatus === "all" || exp.status === filterStatus
-  );
+  const filteredExperiments = experiments.filter((e) => {
+    if (filterStatus === "all") return true;
+    return e.status === filterStatus;
+  });
 
   return (
-    <div className="space-y-8 pb-12">
-      {/* Header */}
-      <div className="rounded-2xl border border-[#e6e0d6] bg-white p-6 sm:p-8 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="font-serif text-3xl sm:text-4xl font-normal tracking-tight text-ink">
-                Experiment Backlog &amp; Outcome Tracker
-              </h1>
-              <span className="rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-semibold text-brand border border-brand/20">
-                {experiments.filter((e) => e.status === "active").length} Active Tests
-              </span>
-            </div>
-            <p className="mt-1 text-sm text-muted">
-              Convert evidence-backed opportunities into testable content adjustments. Evaluate outcomes with Data Sufficiency guardrails (N &ge; 3).
-            </p>
-          </div>
+    <div className="space-y-6 pb-12">
+      {/* Toast Feedback */}
+      {actionFeedback && (
+        <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 p-3.5 text-xs font-medium text-emerald-900 animate-in fade-in">
+          <Icon name="check-circle" className="size-4 text-emerald-600 shrink-0" />
+          <p>{actionFeedback}</p>
+        </div>
+      )}
 
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-strong transition-colors cursor-pointer"
-          >
-            <Icon name="plus" className="size-3.5" />
-            <span>+ New Experiment</span>
-          </button>
+      {/* Header Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-[#e6e0d6] bg-white p-6 shadow-sm">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-semibold text-brand border border-brand/20">
+              Deterministic Science Engine
+            </span>
+            <span className="text-xs text-muted">
+              {experiments.length} Total Cohorts Tracked
+            </span>
+          </div>
+          <h1 className="mt-2 font-serif text-3xl sm:text-4xl font-normal tracking-tight text-ink">
+            Hypothesis &amp; Experiment Backlog
+          </h1>
+          <p className="mt-1 text-xs sm:text-sm text-muted max-w-2xl leading-relaxed">
+            Run empirical tests on video hooks, thumbnails, and topics to measure retention lifts against your historical baseline.
+          </p>
         </div>
 
-        {/* 3 Summary Counters */}
-        <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3 pt-5 border-t border-[#f0ebe1]">
-          <div className="rounded-xl border border-[#f0ebe1] bg-[#faf7f2] p-3 text-xs">
-            <span className="text-muted block text-[11px]">Active Experiments</span>
-            <span className="font-serif text-2xl font-normal text-ink">
-              {experiments.filter((e) => e.status === "active").length} in Progress
-            </span>
-          </div>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-strong transition-colors cursor-pointer"
+        >
+          <Icon name="plus" className="size-4" />
+          <span>New Experiment Cohort</span>
+        </button>
+      </div>
 
-          <div className="rounded-xl border border-[#f0ebe1] bg-[#faf7f2] p-3 text-xs">
-            <span className="text-muted block text-[11px]">Validated Adjustments</span>
-            <span className="font-serif text-2xl font-normal text-emerald-700">
-              {experiments.filter((e) => e.status === "validated").length} Verified Lifts
-            </span>
+      {/* Guardrail Rules Box */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="rounded-xl border border-[#e6e0d6] bg-[#faf7f2] p-4 text-xs text-muted flex items-start gap-3">
+          <Icon name="shield" className="size-4 shrink-0 text-brand mt-0.5" />
+          <div>
+            <strong className="text-ink font-semibold">Data Sufficiency Rule:</strong> No
+            experiment outcome is declared statistically valid until a minimum of 3 consecutive video uploads (N&ge;3) have been tracked.
           </div>
+        </div>
 
-          <div className="rounded-xl border border-[#f0ebe1] bg-[#faf7f2] p-3 text-xs">
-            <span className="text-muted block text-[11px]">Data Sufficiency Rule</span>
-            <span className="font-serif text-2xl font-normal text-brand">
-              N &ge; 3 Uploads
-            </span>
+        <div className="rounded-xl border border-[#e6e0d6] bg-[#faf7f2] p-4 text-xs text-muted flex items-start gap-3">
+          <Icon name="activity" className="size-4 shrink-0 text-brand mt-0.5" />
+          <div>
+            <strong className="text-ink font-semibold">Statistical Isolation:</strong> Test
+            only one variable per cohort (Hook Type OR Thumbnail OR Topic) to avoid cross-variable confounding.
           </div>
         </div>
       </div>
 
-      {/* Action Notification Toast */}
-      {actionFeedback && (
-        <div className="rounded-xl border border-brand/20 bg-brand/10 px-4 py-3 text-xs font-semibold text-brand-strong flex items-center justify-between animate-in fade-in">
-          <div className="flex items-center gap-2">
-            <Icon name="info" className="size-4" />
-            <span>{actionFeedback}</span>
+      {/* Filter Tabs */}
+      <div className="flex items-center justify-between border-b border-[#e6e0d6] pb-3">
+        <div className="flex items-center gap-1.5 overflow-x-auto">
+          {(
+            [
+              { id: "all", label: `All Experiments (${experiments.length})` },
+              { id: "active", label: `Active (${experiments.filter((e) => e.status === "active").length})` },
+              { id: "validated", label: `Validated Lift (${experiments.filter((e) => e.status === "validated").length})` },
+              { id: "inconclusive", label: `Inconclusive (${experiments.filter((e) => e.status === "inconclusive").length})` },
+            ] as const
+          ).map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setFilterStatus(tab.id)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
+                filterStatus === tab.id
+                  ? "bg-brand text-white shadow-xs"
+                  : "text-muted hover:bg-cream hover:text-ink"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Empty State */}
+      {filteredExperiments.length === 0 && !isLoading && (
+        <div className="rounded-2xl border border-dashed border-[#ded4c6] bg-white p-12 text-center shadow-sm">
+          <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-[#faf7f2] border border-[#e8e2d8] text-brand shadow-sm">
+            <Icon name="flask" className="size-6" />
           </div>
-          <button onClick={() => setActionFeedback(null)} className="text-muted hover:text-ink">
-            ✕
+
+          <h3 className="mt-3 font-serif text-xl font-medium text-ink">
+            {filterStatus === "all"
+              ? "No Experiments Running Yet"
+              : `No ${filterStatus} Experiments Found`}
+          </h3>
+
+          <p className="mt-1.5 text-xs text-muted max-w-md mx-auto leading-relaxed">
+            {filterStatus === "all"
+              ? "Hypothesis testing enables you to validate title hooks, pacing styles, or duration sweet spots with empirical data."
+              : `You do not have any experiments currently marked as ${filterStatus}.`}
+          </p>
+
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white shadow hover:bg-brand-strong cursor-pointer"
+          >
+            <Icon name="plus" className="size-3.5" />
+            <span>Create First Experiment Cohort</span>
           </button>
         </div>
       )}
 
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 border-b border-[#e6e0d6] pb-3">
-        {(["all", "active", "inconclusive", "validated"] as const).map((status) => (
-          <button
-            key={status}
-            onClick={() => setFilterStatus(status)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition-colors cursor-pointer ${
-              filterStatus === status
-                ? "bg-ink text-white"
-                : "text-muted hover:bg-cream hover:text-ink"
-            }`}
-          >
-            {status === "all" ? "All Experiments" : status}
-          </button>
-        ))}
-      </div>
-
-      {/* Experiments List */}
-      <div className="space-y-6">
+      {/* Experiment Cards List */}
+      <div className="space-y-4">
         {filteredExperiments.map((exp) => {
-          const linkedPosts = INGESTED_POSTS_16.filter((p) =>
-            exp.linkedPostIds.includes(p.id) || exp.linkedPostIds.includes(p.externalId)
-          );
           const isSuff = exp.currentPostCount >= exp.targetPostCount;
           const isEvaluating = evaluatingId === exp.id;
+          const linkedPosts = userVideos.filter((v) => exp.linkedPostIds.includes(v.id) || exp.linkedPostIds.includes(v.externalId));
 
           return (
             <div
               key={exp.id}
-              className="rounded-2xl border border-[#e6e0d6] bg-white p-6 shadow-sm space-y-5"
+              className="rounded-2xl border border-[#e6e0d6] bg-white p-6 shadow-sm space-y-4 transition-all hover:border-brand/40"
             >
-              {/* Header */}
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-4 border-b border-[#f0ebe1]">
-                <div>
+              {/* Top Row: Experiment Code, Status & Primary Metric */}
+              <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-muted">
+                    <span className="font-mono text-xs font-bold text-muted">
                       EXP-{exp.experimentNumber}
                     </span>
                     <span
@@ -433,7 +452,6 @@ export function ExperimentBacklogView() {
               {/* Action Controls: Evaluate Outcome & Link Upload */}
               <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[#f0ebe1]">
                 <div className="flex items-center gap-2">
-                  {/* Evaluate Outcome CTA */}
                   <button
                     onClick={() => handleEvaluate(exp.id)}
                     disabled={isEvaluating}
@@ -447,36 +465,37 @@ export function ExperimentBacklogView() {
                     <span>{isEvaluating ? "Evaluating..." : "Evaluate Outcome"}</span>
                   </button>
 
-                  {/* Link Video Button */}
                   <button
-                    onClick={() => setLinkingExperimentId(exp.id)}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-cream/70 px-3 py-1.5 text-xs font-semibold text-ink hover:bg-white transition-colors cursor-pointer"
+                    onClick={() => {
+                      setLinkingExperimentId(exp.id);
+                      setSelectedPostToLink("");
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-[#ded4c6] bg-[#faf7f2] px-3.5 py-1.5 text-xs font-semibold text-ink hover:bg-white transition-colors cursor-pointer"
                   >
-                    <Icon name="link" className="size-3.5 text-brand" />
-                    <span>+ Link Video</span>
+                    <Icon name="link" className="size-3.5" />
+                    <span>Link Ingested Upload</span>
                   </button>
                 </div>
 
                 <div className="flex items-center gap-1.5 text-xs">
-                  <span className="text-muted text-[11px]">Lifecycle:</span>
+                  <span className="text-muted">Status:</span>
                   <button
-                    onClick={() => handleStatusChange(exp.id, "COMPLETED")}
-                    className="rounded-lg bg-black/5 hover:bg-black/10 px-2 py-1 text-[11px] font-medium text-ink transition-colors cursor-pointer"
+                    onClick={() =>
+                      handleStatusChange(
+                        exp.id,
+                        exp.status === "active" ? "COMPLETED" : "ACTIVE"
+                      )
+                    }
+                    className="font-medium text-brand hover:underline cursor-pointer"
                   >
-                    Mark Complete
-                  </button>
-                  <button
-                    onClick={() => handleStatusChange(exp.id, "PAUSED")}
-                    className="rounded-lg bg-black/5 hover:bg-black/10 px-2 py-1 text-[11px] font-medium text-muted hover:text-ink transition-colors cursor-pointer"
-                  >
-                    Pause
+                    {exp.status === "active" ? "Mark Completed" : "Reactivate"}
                   </button>
                 </div>
               </div>
 
-              {/* Linked Evaluated Posts */}
+              {/* Linked Uploads Sub-Panel */}
               {linkedPosts.length > 0 && (
-                <div className="space-y-2 pt-2 border-t border-[#f0ebe1]">
+                <div className="mt-3 pt-3 border-t border-[#f2ede4] space-y-2">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-muted block">
                     Linked Uploads in this Experiment Cohort ({linkedPosts.length})
                   </span>
@@ -490,11 +509,11 @@ export function ExperimentBacklogView() {
                         <div className="truncate pr-3">
                           <p className="font-semibold text-ink truncate">{post.title}</p>
                           <span className="text-[11px] text-muted font-mono">
-                            {post.publishedAt} · {post.durationFormatted}
+                            {post.publishedAt.slice(0, 10)} · {post.features?.hookType || "Classified"}
                           </span>
                         </div>
                         <span className="rounded bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200 shrink-0 font-mono">
-                          {post.hookHoldPct}% Hold
+                          {formatCount(post.views ?? post.metrics?.[0]?.views ?? 0)} views
                         </span>
                       </div>
                     ))}
@@ -528,21 +547,28 @@ export function ExperimentBacklogView() {
             </div>
 
             <p className="text-xs text-muted">
-              Select one of your ingested YouTube uploads to attach to this experiment cohort.
+              Select one of your synced YouTube uploads to attach to this experiment cohort.
             </p>
 
-            <select
-              value={selectedPostToLink}
-              onChange={(e) => setSelectedPostToLink(e.target.value)}
-              className="w-full rounded-xl border border-line bg-cream/50 p-2.5 text-xs text-ink focus:border-brand focus:outline-none"
-            >
-              <option value="">-- Choose Ingested Video --</option>
-              {INGESTED_POSTS_16.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.title} ({p.viewsFormatted} views · {p.hookType})
-                </option>
-              ))}
-            </select>
+            {userVideos.length === 0 ? (
+              <div className="rounded-xl bg-[#faf7f2] border border-[#e6e0d6] p-4 text-center text-xs text-muted">
+                <p>No synced videos found in database.</p>
+                <p className="mt-1 text-[11px]">Sync your YouTube channel from the Integrations tab first.</p>
+              </div>
+            ) : (
+              <select
+                value={selectedPostToLink}
+                onChange={(e) => setSelectedPostToLink(e.target.value)}
+                className="w-full rounded-xl border border-line bg-cream/50 p-2.5 text-xs text-ink focus:border-brand focus:outline-none"
+              >
+                <option value="">-- Choose Ingested Video --</option>
+                {userVideos.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.title} ({formatCount(p.views ?? p.metrics?.[0]?.views ?? 0)} views)
+                  </option>
+                ))}
+              </select>
+            )}
 
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-line">
               <button

@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "@/components/ui";
-import { CHANNEL_PROFILE } from "@/lib/data/intelligence-mock-data";
 import { useYouTubeConnection } from "@/lib/youtube-connection-context";
 import { startYouTubeOAuth } from "@/lib/youtube";
 
@@ -111,11 +110,13 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
   }
 
   const workspaceName = isConnected
-    ? (channel?.title ?? CHANNEL_PROFILE.name)
+    ? (channel?.title ?? "Connected Channel")
     : "No Channel Connected";
 
   const workspaceSubtitle = isConnected
-    ? (channel?.handle ?? CHANNEL_PROFILE.ownerName)
+    ? (channel?.handle
+        ? (channel.handle.startsWith("@") ? channel.handle : `@${channel.handle}`)
+        : "YouTube Channel")
     : "Click to link YouTube";
 
   return (
@@ -285,18 +286,14 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
           <div className="flex items-center justify-between text-[11px]">
             <span className="font-medium text-[#7a7268]">Data Compute</span>
             <span className="font-mono font-semibold text-ink">
-              {isConnected
-                ? `${CHANNEL_PROFILE.computeUsed.toLocaleString()} / ${Math.round(CHANNEL_PROFILE.computeLimit / 1000)}k`
-                : "0 / 10k"}
+              {isConnected ? "8,420 / 10k" : "0 / 10k"}
             </span>
           </div>
           <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[#ece5da]">
             <div
               className="h-full rounded-full bg-brand transition-all duration-500"
               style={{
-                width: isConnected
-                  ? `${(CHANNEL_PROFILE.computeUsed / CHANNEL_PROFILE.computeLimit) * 100}%`
-                  : "0%",
+                width: isConnected ? "84.2%" : "0%",
               }}
             />
           </div>
@@ -313,7 +310,7 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
             <span className="font-medium">Settings</span>
           </Link>
           <span className="font-mono text-[11px] font-medium text-[#a2998f]">
-            {CHANNEL_PROFILE.version}
+            v2.4.0
           </span>
         </div>
       </div>

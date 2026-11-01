@@ -1,21 +1,44 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Icon } from "@/components/ui";
-import { EVIDENCE_OPPORTUNITIES } from "@/lib/data/intelligence-mock-data";
-import type { EvidenceOpportunity } from "@/lib/types/creator-intelligence";
+import { getRecommendations, type ApiRecommendation } from "@/lib/insights";
 import { startYouTubeOAuth } from "@/lib/youtube";
 import { useYouTubeConnection } from "@/lib/youtube-connection-context";
-import Link from "next/link";
 import { CreateExperimentModal } from "@/components/dashboard/create-experiment-modal";
 
 export function EvidenceOpportunitiesCard() {
   const { isConnected } = useYouTubeConnection();
-  const [activeModalItem, setActiveModalItem] = useState<EvidenceOpportunity | null>(null);
+  const [recommendations, setRecommendations] = useState<ApiRecommendation[]>([]);
+  const [activeModalItem, setActiveModalItem] = useState<ApiRecommendation | null>(null);
   const [isExperimentModalOpen, setIsExperimentModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Empty state when YouTube is not connected
-  if (!isConnected) {
+  useEffect(() => {
+    let isMounted = true;
+    async function load() {
+      if (!isConnected) return;
+      setIsLoading(true);
+      try {
+        const data = await getRecommendations();
+        if (isMounted && data && Array.isArray(data.recommendations)) {
+          setRecommendations(data.recommendations);
+        }
+      } catch (err) {
+        console.warn("Failed to fetch recommendations:", err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+    load();
+    return () => {
+      isMounted = false;
+    };
+  }, [isConnected]);
+
+  // Empty state when YouTube is not connected OR when no opportunities generated yet
+  if (!isConnected || recommendations.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-[#ded4c6] bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] sm:p-6">
         {/* Header */}
@@ -25,11 +48,11 @@ export function EvidenceOpportunitiesCard() {
               <Icon name="spark" className="size-3.5" />
             </span>
             <h2 className="text-base font-semibold text-ink">
-              Top 3 Evidence-Backed Opportunities
+              Evidence-Backed Opportunities
             </h2>
           </div>
           <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-            Awaiting Ingestion
+            {!isConnected ? "Awaiting Ingestion" : "Sync & Analyze"}
           </span>
         </div>
 
@@ -43,17 +66,29 @@ export function EvidenceOpportunitiesCard() {
             No Opportunities Generated Yet
           </h3>
           <p className="mt-1.5 max-w-md mx-auto text-xs text-[#70665b] leading-relaxed">
-            Link your YouTube channel to allow Gemini AI and our regression engine to scan your video library, identify audience churn bottlenecks, and prescribe evidence-backed fixes.
+            {!isConnected
+              ? "Link your YouTube channel to allow Gemini AI and our regression engine to scan your video library, identify audience churn bottlenecks, and prescribe evidence-backed fixes."
+              : "Sync your channel uploads and run AI analysis to detect audience churn patterns and generate high-confidence prescriptive opportunities."}
           </p>
 
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
-            <button
-              onClick={() => startYouTubeOAuth()}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#e62117] px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#cc1810]"
-            >
-              <Icon name="youtube" className="size-4" />
-              <span>Connect YouTube Account</span>
-            </button>
+            {!isConnected ? (
+              <button
+                onClick={() => startYouTubeOAuth()}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#e62117] px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#cc1810]"
+              >
+                <Icon name="youtube" className="size-4" />
+                <span>Connect YouTube Account</span>
+              </button>
+            ) : (
+              <Link
+                href="/dashboard/youtube"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-strong"
+              >
+                <Icon name="refresh-cw" className="size-3.5" />
+                <span>Sync &amp; Analyze Videos</span>
+              </Link>
+            )}
             <Link
               href="/dashboard/insights"
               className="rounded-xl border border-[#ded4c6] bg-white px-3.5 py-2 text-xs font-semibold text-[#665e54] hover:bg-[#faf7f2]"
@@ -96,7 +131,7 @@ export function EvidenceOpportunitiesCard() {
                 </div>
               </div>
               <span className="rounded bg-[#f4ede3] px-2 py-0.5 text-[10px] font-medium text-[#8a7f72] shrink-0">
-                Locked
+                Awaiting Data
               </span>
             </div>
           ))}
@@ -105,7 +140,7 @@ export function EvidenceOpportunitiesCard() {
     );
   }
 
-  // Connected state
+  // Connected state with real recommendations
   return (
     <>
       <div className="rounded-2xl border border-[#e6e0d6] bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] sm:p-6">
@@ -116,47 +151,45 @@ export function EvidenceOpportunitiesCard() {
               <Icon name="spark" className="size-3.5" />
             </span>
             <h2 className="text-base font-semibold text-ink">
-              Top 3 Evidence-Backed Opportunities
+              Top Evidence-Backed Opportunities
             </h2>
           </div>
           <Link
             href="/dashboard/insights"
             className="rounded-full bg-[#f6f2ea] border border-[#e8e2d8] px-2.5 py-1 text-[11px] font-semibold text-brand hover:underline"
           >
-            View All Evidence &rarr;
+            View All ({recommendations.length}) &rarr;
           </Link>
         </div>
 
-        {/* 3 Opportunities List */}
+        {/* Opportunities List */}
         <div className="mt-4 divide-y divide-[#f2ede4]">
-          {EVIDENCE_OPPORTUNITIES.map((opp) => (
-            <div key={opp.id} className="py-4 first:pt-1 last:pb-1">
+          {recommendations.slice(0, 3).map((rec, idx) => (
+            <div key={rec.id} className="py-4 first:pt-1 last:pb-1">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <span className="grid size-6 shrink-0 place-items-center rounded-md bg-[#faf7f2] border border-[#e8e2d8] text-xs font-bold text-ink">
-                    {opp.numberBadge}
+                    #{idx + 1}
                   </span>
                   <h3 className="text-sm font-semibold text-ink">
-                    {opp.title}
+                    {rec.title}
                   </h3>
-                  {opp.badgeLabel && (
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                        opp.badgeColor === "red"
-                          ? "bg-rose-50 text-rose-700 border border-rose-200"
-                          : "bg-[#f5efe6] text-[#786f65]"
-                      }`}
-                    >
-                      {opp.badgeLabel}
-                    </span>
-                  )}
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                      rec.priority === "HIGH"
+                        ? "bg-rose-50 text-rose-700 border border-rose-200"
+                        : "bg-[#f5efe6] text-[#786f65]"
+                    }`}
+                  >
+                    {rec.priority}
+                  </span>
                 </div>
 
                 <button
-                  onClick={() => setActiveModalItem(opp)}
-                  className="group inline-flex items-center gap-1 text-xs font-semibold text-brand transition-colors hover:text-brand-strong"
+                  onClick={() => setActiveModalItem(rec)}
+                  className="group inline-flex items-center gap-1 text-xs font-semibold text-brand transition-colors hover:text-brand-strong cursor-pointer"
                 >
-                  <span>{opp.actionLabel}</span>
+                  <span>Prescription</span>
                   <Icon
                     name="arrow-right"
                     className="size-3 transition-transform group-hover:translate-x-0.5"
@@ -165,13 +198,13 @@ export function EvidenceOpportunitiesCard() {
               </div>
 
               <p className="mt-2 text-xs text-[#6b6257] leading-relaxed">
-                {opp.description}
+                {rec.why}
               </p>
 
               {/* Prescription Callout Box */}
               <div className="mt-2.5 rounded-xl border border-[#efe9dc] bg-[#fbf9f5] px-3.5 py-2 text-xs text-[#5c544b]">
                 <strong className="font-semibold text-brand">Prescription:</strong>{" "}
-                <span>{opp.prescription.replace("Prescription: ", "")}</span>
+                <span>{rec.action}</span>
               </div>
             </div>
           ))}
@@ -189,9 +222,9 @@ export function EvidenceOpportunitiesCard() {
             <div className="flex items-center justify-between border-b border-line pb-3">
               <div className="flex items-center gap-2">
                 <span className="rounded-md bg-brand/10 px-2 py-0.5 text-xs font-bold text-brand">
-                  {activeModalItem.numberBadge}
+                  {activeModalItem.category}
                 </span>
-                <h3 className="text-sm font-bold text-ink">{activeModalItem.title}</h3>
+                <h3 className="text-sm font-bold text-ink truncate">{activeModalItem.title}</h3>
               </div>
               <button
                 onClick={() => setActiveModalItem(null)}
@@ -202,22 +235,22 @@ export function EvidenceOpportunitiesCard() {
             </div>
 
             <div className="mt-4 space-y-3 text-xs text-[#6b6257]">
-              <p>{activeModalItem.description}</p>
+              <p>{activeModalItem.why}</p>
               <div className="rounded-xl border border-brand/20 bg-brand/5 p-3.5 text-ink">
                 <p className="font-semibold text-brand">Prescription Engine Recommendation</p>
                 <p className="mt-1 text-xs leading-relaxed text-[#5c544b]">
-                  {activeModalItem.prescription}
+                  {activeModalItem.action}
                 </p>
               </div>
               <div className="rounded-xl border border-line bg-cream/60 p-3 text-[11px] text-muted">
-                Confidence Score: <strong>94.2%</strong> · Calibrated against historical uploads in Tech &amp; Studio Craft cohort.
+                Confidence Score: <strong>{Math.round(activeModalItem.confidence * 100)}%</strong> · {activeModalItem.measurement}
               </div>
             </div>
 
             <div className="mt-6 flex items-center justify-end gap-2.5">
               <button
                 onClick={() => setActiveModalItem(null)}
-                className="rounded-xl border border-[#ded6c7] px-3.5 py-2 text-xs font-semibold text-muted hover:bg-cream"
+                className="rounded-xl border border-[#ded6c7] px-3.5 py-2 text-xs font-semibold text-muted hover:bg-cream cursor-pointer"
               >
                 Close
               </button>
@@ -226,7 +259,7 @@ export function EvidenceOpportunitiesCard() {
                   setActiveModalItem(null);
                   setIsExperimentModalOpen(true);
                 }}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white shadow hover:bg-brand-strong"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white shadow hover:bg-brand-strong cursor-pointer"
               >
                 <Icon name="flask" className="size-3.5" />
                 <span>Turn into Experiment</span>

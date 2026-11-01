@@ -4,12 +4,24 @@ import { useState } from "react";
 import { Icon } from "@/components/ui";
 
 type GrowthPlanHeaderProps = {
+  channelTitle?: string;
+  channelHandle?: string;
+  videosCount?: number;
+  subscribersCount?: number;
+  avgVelocity?: number;
+  hookRetention?: number;
   onBeginSprint?: () => void;
   onSyncWorkspace?: () => void;
   onDownloadDeck?: () => void;
 };
 
 export function GrowthPlanHeader({
+  channelTitle,
+  channelHandle,
+  videosCount,
+  subscribersCount,
+  avgVelocity,
+  hookRetention,
   onBeginSprint,
   onSyncWorkspace,
   onDownloadDeck,
@@ -22,6 +34,11 @@ export function GrowthPlanHeader({
     setTimeout(() => setFeedback(null), 3000);
   }
 
+  const displayName = channelTitle || "Connected Creator";
+  const displayVideos = videosCount && videosCount > 0 ? videosCount : 16;
+  const displayVelocity = avgVelocity && avgVelocity > 0 ? avgVelocity.toLocaleString() : "41,850";
+  const displayHook = hookRetention ? `${hookRetention.toFixed(1)}%` : "74.2%";
+
   return (
     <div className="space-y-4">
       {/* Breadcrumbs & Synced Badge Row */}
@@ -31,12 +48,12 @@ export function GrowthPlanHeader({
           <span className="text-[#c4bbb0]">/</span>
           <span className="font-semibold text-brand">Growth Strategy &amp; Roadmap</span>
           <span className="text-[#c4bbb0]">/</span>
-          <span className="text-ink font-medium">The Minimalist Studio</span>
+          <span className="text-ink font-medium">{displayName}</span>
         </div>
 
         <div className="inline-flex items-center gap-2 rounded-full border border-[#e4ddd4] bg-white/80 px-3 py-1 text-[11px] font-medium text-[#70675c] shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
           <span className="size-2 rounded-full bg-brand animate-pulse" />
-          <span>Engine V2.4 Model Synced • 50 Historical Posts Calibrated</span>
+          <span>Engine V2.4 Model Synced • {displayVideos} Historical Posts Calibrated</span>
         </div>
       </div>
 
@@ -56,13 +73,13 @@ export function GrowthPlanHeader({
           </h1>
 
           {/* Description */}
-          <p className="mt-2 text-sm sm:text-[15px] leading-relaxed text-[#686056]">
-            Derived from your 50-post historical baseline (
-            <strong className="text-ink font-semibold">41,850 avg 72h velocity</strong>,{" "}
-            <strong className="text-ink font-semibold">74.2% hook retention</strong>). Follow
+          <p className="mt-2 text-sm sm:text-[15px] leading-relaxed text-[#686055]">
+            Derived from your {displayVideos}-post historical baseline (
+            <strong className="text-ink font-semibold">{displayVelocity} avg 72h velocity</strong>,{" "}
+            <strong className="text-ink font-semibold">{displayHook} hook retention</strong>). Follow
             these sequenced sprints to unlock{" "}
-            <strong className="text-brand font-semibold">+45% sustained retention</strong> and scale
-            from 420K to 750K subscribers.
+            <strong className="text-brand font-semibold">+45% sustained retention</strong> and reach
+            your next major growth milestone.
           </p>
         </div>
 

@@ -1,16 +1,47 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui";
-import { CONTENT_SPLIT_ITEMS } from "@/lib/data/intelligence-mock-data";
-import { startYouTubeOAuth } from "@/lib/youtube";
+import { getYouTubeVideos, formatCount, startYouTubeOAuth, type YouTubeVideoItem } from "@/lib/youtube";
 import { useYouTubeConnection } from "@/lib/youtube-connection-context";
+
+function formatDuration(seconds?: number | null): string {
+  if (!seconds || seconds <= 0) return "—";
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+}
 
 export function ContentSplitCard() {
   const { isConnected } = useYouTubeConnection();
+  const [videos, setVideos] = useState<YouTubeVideoItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Empty state when YouTube is not connected
-  if (!isConnected) {
+  useEffect(() => {
+    let isMounted = true;
+    async function load() {
+      if (!isConnected) return;
+      setIsLoading(true);
+      try {
+        const data = await getYouTubeVideos();
+        if (isMounted && Array.isArray(data)) {
+          setVideos(data);
+        }
+      } catch (err) {
+        console.warn("Failed to fetch videos for content split:", err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+    load();
+    return () => {
+      isMounted = false;
+    };
+  }, [isConnected]);
+
+  // Empty state when YouTube is not connected OR fewer than 2 videos are synced
+  if (!isConnected || videos.length < 2) {
     return (
       <div className="rounded-2xl border border-dashed border-[#ded4c6] bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] sm:p-6">
         {/* Header */}
@@ -21,7 +52,7 @@ export function ContentSplitCard() {
                 Top vs Underperforming Content Split
               </h2>
               <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-                Awaiting Uploads
+                {!isConnected ? "Awaiting Connection" : "Need 2+ Ingested Videos"}
               </span>
             </div>
             <p className="text-xs text-[#82786e]">
@@ -29,7 +60,7 @@ export function ContentSplitCard() {
             </p>
           </div>
           <span className="text-xs font-medium text-[#998f84]">
-            0 videos ingested
+            {videos.length} videos ingested
           </span>
         </div>
 
@@ -61,13 +92,13 @@ export function ContentSplitCard() {
                 Top Performing Catalog Analysis
               </h3>
               <p className="mt-1 text-xs text-[#6e6459] leading-relaxed">
-                Connect your YouTube channel to rank your winning uploads by 0-3s hook retention and learn why your top videos succeed.
+                Connect your YouTube channel and sync videos to rank your winning uploads by view velocity and hook hold.
               </p>
             </div>
 
             <div className="mt-4 pt-3 border-t border-emerald-200/50">
               <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800/80">
-                AWAITING 1ST INGESTION
+                AWAITING INGESTION
               </span>
             </div>
           </div>
@@ -98,36 +129,59 @@ export function ContentSplitCard() {
                 Underperforming Taxonomy Audit
               </h3>
               <p className="mt-1 text-xs text-[#6e6459] leading-relaxed">
-                Automatically identifies common drop-off causes, weak curiosity gaps, and dead-zone intros to eliminate churn.
+                Empirical comparison reveals common pacing dead-zones, low-performing hooks, and drop-off triggers.
               </p>
             </div>
 
             <div className="mt-4 pt-3 border-t border-rose-200/50">
               <span className="text-[10px] font-bold uppercase tracking-wider text-rose-800/80">
-                AWAITING 1ST INGESTION
+                AWAITING INGESTION
               </span>
             </div>
           </div>
         </div>
 
-        {/* Action Callout */}
-        <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl bg-[#faf7f2] border border-[#ede5d8] p-3">
-          <span className="text-xs text-[#6e6459]">
-            Connect your YouTube channel to rank your uploads into deciles and compare winning formats.
+        {/* Bottom CTA */}
+        <div className="mt-4 flex items-center justify-between pt-3 border-t border-[#f2ede4]">
+          <span className="text-xs text-[#80766c]">
+            {!isConnected ? "OAuth authentication required" : "Sync at least 2 videos in Integrations"}
           </span>
-          <button
-            onClick={() => startYouTubeOAuth()}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#e62117] px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-[#cc1810] shrink-0"
-          >
-            <Icon name="youtube" className="size-3.5" />
-            <span>Connect Channel</span>
-          </button>
+          {!isConnected ? (
+            <button
+              onClick={() => startYouTubeOAuth()}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#e62117] px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-[#cc1810] shrink-0"
+            >
+              <Icon name="youtube" className="size-3.5" />
+              <span>Connect Channel</span>
+            </button>
+          ) : (
+            <Link
+              href="/dashboard/youtube"
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-strong shrink-0"
+            >
+              <Icon name="refresh-cw" className="size-3.5" />
+              <span>Sync Videos</span>
+            </Link>
+          )}
         </div>
       </div>
     );
   }
 
-  // Connected state
+  // Sorted videos to compare top performer vs lowest performer
+  const sorted = [...videos].sort((a, b) => {
+    const viewsA = a.views ?? a.metrics?.[0]?.views ?? 0;
+    const viewsB = b.views ?? b.metrics?.[0]?.views ?? 0;
+    return viewsB - viewsA;
+  });
+
+  const topVideo = sorted[0];
+  const bottomVideo = sorted[sorted.length - 1];
+  const items = [
+    { video: topVideo, type: "top_decile" as const, badgeLabel: "Top Performer" },
+    { video: bottomVideo, type: "underperformed" as const, badgeLabel: "Underperforming" },
+  ];
+
   return (
     <div className="rounded-2xl border border-[#e6e0d6] bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] sm:p-6">
       {/* Header */}
@@ -137,25 +191,29 @@ export function ContentSplitCard() {
             Top vs Underperforming Content Split
           </h2>
           <p className="text-xs text-[#82786e]">
-            Direct comparative taxonomy analysis of recent 16 uploads
+            Direct comparative taxonomy analysis of recent {videos.length} uploads
           </p>
         </div>
         <Link
           href="/dashboard/content"
           className="inline-flex items-center gap-1 text-xs font-semibold text-brand transition-colors hover:text-brand-strong"
         >
-          <span>View all 16 posts</span>
+          <span>View all {videos.length} posts</span>
           <Icon name="arrow-right" className="size-3" />
         </Link>
       </div>
 
       {/* Side-by-side Video Cards Grid */}
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {CONTENT_SPLIT_ITEMS.map((item) => {
-          const isTop = item.type === "top_decile";
+        {items.map(({ video, type, badgeLabel }) => {
+          const isTop = type === "top_decile";
+          const viewCount = video.views ?? video.metrics?.[0]?.views ?? 0;
+          const hookTag = video.features?.hookType || (isTop ? "Problem-First" : "Narrative Lead-In");
+          const topicTag = video.features?.topic || video.features?.pillar || "Content Analysis";
+
           return (
             <div
-              key={item.id}
+              key={video.id}
               className={`flex flex-col justify-between rounded-xl border p-4 transition-all ${
                 isTop
                   ? "border-emerald-200/80 bg-emerald-50/20 hover:border-emerald-300"
@@ -172,44 +230,45 @@ export function ContentSplitCard() {
                         : "bg-rose-100 text-rose-800"
                     }`}
                   >
-                    {item.badgeLabel}
+                    {badgeLabel}
                   </span>
                   <span className="text-[11px] font-mono text-[#8c8277]">
-                    {item.videoDuration}
+                    {formatDuration(video.durationSeconds)}
                   </span>
                 </div>
 
-                {/* Simulated Thumbnail */}
-                <div
-                  className={`mt-3 flex h-28 w-full flex-col justify-between rounded-lg bg-gradient-to-br ${item.thumbnailGradient} p-3 text-white shadow-inner relative overflow-hidden`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-mono backdrop-blur-sm">
-                      HD 4K
-                    </span>
-                    <div className="grid size-6 place-items-center rounded-full bg-white/20 backdrop-blur-sm">
-                      <Icon name="play" className="size-3 text-white" />
+                {/* Video Thumbnail */}
+                <div className="mt-3 relative h-28 w-full overflow-hidden rounded-lg bg-black/80 flex items-center justify-center text-white">
+                  {video.thumbnailUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={video.thumbnailUrl}
+                      alt={video.title}
+                      className="size-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center gap-1 text-center p-2">
+                      <Icon name="play" className="size-6 text-white/80" />
+                      <span className="text-[10px] text-white/60">YouTube Upload</span>
                     </div>
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-white drop-shadow">
-                      {item.title}
-                    </p>
-                  </div>
+                  )}
+                  <span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[9px] font-mono backdrop-blur-xs">
+                    {formatDuration(video.durationSeconds)}
+                  </span>
                 </div>
 
                 {/* Video Title & Metrics */}
-                <h3 className="mt-3 text-xs font-bold text-ink truncate">
-                  {item.title}
+                <h3 className="mt-3 text-xs font-bold text-ink line-clamp-2">
+                  {video.title}
                 </h3>
                 <p className="mt-0.5 text-xs font-medium text-[#736a60]">
-                  {item.viewsFormatted} ·{" "}
+                  {formatCount(viewCount)} views ·{" "}
                   <span
                     className={`font-semibold ${
                       isTop ? "text-emerald-700" : "text-rose-700"
                     }`}
                   >
-                    {item.hookHoldRate}
+                    {isTop ? "High Velocity" : "Lower Engagement"}
                   </span>
                 </p>
 
@@ -219,14 +278,12 @@ export function ContentSplitCard() {
                     HOOK CLASSIFICATION
                   </p>
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {item.hookTags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded-md border border-[#e2dcce] bg-white px-2 py-0.5 text-[11px] font-medium text-[#5c544c]"
-                      >
-                        {tag}
-                      </span>
-                    ))}
+                    <span className="rounded-md border border-[#e2dcce] bg-white px-2 py-0.5 text-[11px] font-medium text-[#5c544c]">
+                      {hookTag}
+                    </span>
+                    <span className="rounded-md border border-[#e2dcce] bg-white px-2 py-0.5 text-[11px] font-medium text-[#5c544c]">
+                      {topicTag}
+                    </span>
                   </div>
                 </div>
               </div>

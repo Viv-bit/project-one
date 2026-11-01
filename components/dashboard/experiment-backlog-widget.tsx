@@ -1,43 +1,74 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Icon } from "@/components/ui";
-import { EXPERIMENT_HYPOTHESES } from "@/lib/data/intelligence-mock-data";
-import type { ExperimentHypothesis } from "@/lib/types/creator-intelligence";
+import {
+  getExperiments,
+  createExperiment,
+  type ApiExperiment,
+} from "@/lib/experiments";
 import { startYouTubeOAuth } from "@/lib/youtube";
 import { useYouTubeConnection } from "@/lib/youtube-connection-context";
-import Link from "next/link";
 
 export function ExperimentBacklogWidget() {
   const { isConnected } = useYouTubeConnection();
-  const [hypotheses, setHypotheses] = useState<ExperimentHypothesis[]>(() =>
-    isConnected ? EXPERIMENT_HYPOTHESES : []
-  );
+  const [experiments, setExperiments] = useState<ApiExperiment[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newPredictedLift, setNewPredictedLift] = useState("+15% Watch Time");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleCreateHypothesis(e: React.FormEvent) {
+  useEffect(() => {
+    let isMounted = true;
+    async function load() {
+      setIsLoading(true);
+      try {
+        const data = await getExperiments();
+        if (isMounted && Array.isArray(data)) {
+          setExperiments(data);
+        }
+      } catch (err) {
+        console.warn("Failed to fetch experiments for widget:", err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+    load();
+    return () => {
+      isMounted = false;
+    };
+  }, [isConnected]);
+
+  async function handleCreateHypothesis(e: React.FormEvent) {
     e.preventDefault();
     if (!newTitle.trim()) return;
 
-    const newHyp: ExperimentHypothesis = {
-      id: `hyp-${Date.now()}`,
-      hypothesisNumber: hypotheses.length + 1,
-      title: newTitle.trim(),
-      confidencePct: 85,
-      predictedLift: `Predicted Lift: ${newPredictedLift}`,
-      sampleSizeNote: "N=1 planned upload",
-      status: "active",
-    };
+    try {
+      setIsSubmitting(true);
+      const created = await createExperiment({
+        title: newTitle.trim(),
+        hypothesis: `Testing: ${newTitle.trim()} with predicted target lift ${newPredictedLift}.`,
+        category: "HOOK",
+        primaryMetric: "median_views",
+        targetPostCount: 3,
+        durationDays: 14,
+      });
 
-    setHypotheses([newHyp, ...hypotheses]);
-    setNewTitle("");
-    setIsModalOpen(false);
+      if (created) {
+        setExperiments((prev) => [created, ...prev]);
+      }
+      setNewTitle("");
+      setIsModalOpen(false);
+    } catch (err) {
+      console.error("Failed to create experiment:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
-  // Empty state when YouTube is not connected AND no hypotheses drafted yet
-  const showEmptyState = !isConnected && hypotheses.length === 0;
+  const showEmptyState = experiments.length === 0;
 
   return (
     <>
@@ -50,16 +81,16 @@ export function ExperimentBacklogWidget() {
             </span>
             <h2 className="text-base font-semibold text-ink">Experiment Backlog</h2>
           </div>
-          {isConnected ? (
+          {experiments.length > 0 ? (
             <Link
               href="/dashboard/experiments"
               className="rounded-full bg-[#f6f2ea] border border-[#e8e2d8] px-2 py-0.5 text-[10px] font-semibold text-brand hover:underline"
             >
-              {hypotheses.length} Active Tests &rarr;
+              {experiments.length} Active Tests &rarr;
             </Link>
           ) : (
             <span className="rounded-full bg-[#f6f2ea] border border-[#e8e2d8] px-2 py-0.5 text-[10px] font-semibold text-[#8a7f72]">
-              {hypotheses.length} Active Tests
+              0 Active Tests
             </span>
           )}
         </div>
@@ -75,47 +106,71 @@ export function ExperimentBacklogWidget() {
               No Active Experiments
             </h3>
             <p className="mt-1 text-xs text-[#70665b] leading-relaxed">
-              Connect your YouTube channel to generate automated title &amp; hook hypotheses, or draft your first manual test.
+              {!isConnected
+                ? "Connect your YouTube channel to generate automated title & hook hypotheses, or draft your first manual test."
+                : "Create your first empirical test to validate hook retention, topic framing, or duration sweet-spots."}
             </p>
 
-            <button
-              onClick={() => startYouTubeOAuth()}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-[#ded4c6] bg-white px-3 py-1.5 text-xs font-semibold text-[#5c5348] hover:bg-[#faf7f2] transition-colors"
-            >
-              <Icon name="youtube" className="size-3.5 text-red-600" />
-              <span>Connect for AI Tests</span>
-            </button>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              {!isConnected ? (
+                <button
+                  onClick={() => startYouTubeOAuth()}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#ded4c6] bg-white px-3 py-1.5 text-xs font-semibold text-[#5c5348] hover:bg-[#faf7f2] transition-colors"
+                >
+                  <Icon name="youtube" className="size-3.5 text-red-600" />
+                  <span>Connect Channel</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-strong transition-colors"
+                >
+                  <Icon name="plus" className="size-3.5" />
+                  <span>Draft First Experiment</span>
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           <div className="mt-3.5 space-y-3">
-            {hypotheses.map((hyp) => (
-              <div
-                key={hyp.id}
-                className="rounded-xl border border-[#ede7dd] bg-[#faf8f4] p-3.5 transition-all hover:border-brand/40"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-ink">
-                    Hypothesis #{hyp.hypothesisNumber}
-                  </span>
-                  <span className="rounded bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800">
-                    {hyp.confidencePct}% Confidence
-                  </span>
-                </div>
+            {experiments.slice(0, 3).map((exp, idx) => {
+              const currentCount = exp.posts?.length ?? exp.progress?.currentPostsCount ?? 0;
+              const targetCount = exp.targetPostCount ?? 3;
+              const liftText = exp.result?.deltaPercent != null
+                ? `${exp.result.deltaPercent >= 0 ? "+" : ""}${exp.result.deltaPercent.toFixed(1)}%`
+                : exp.liftPct != null
+                ? `+${exp.liftPct}%`
+                : "Awaiting Result";
 
-                <p className="mt-2 text-xs font-semibold text-ink leading-snug">
-                  {hyp.title}
-                </p>
+              return (
+                <div
+                  key={exp.id}
+                  className="rounded-xl border border-[#ede7dd] bg-[#faf8f4] p-3.5 transition-all hover:border-brand/40"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-ink">
+                      Test #{idx + 1} · {exp.category}
+                    </span>
+                    <span className="rounded bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800">
+                      {exp.status}
+                    </span>
+                  </div>
 
-                <div className="mt-2.5 flex items-center justify-between text-[11px] text-[#7a7167] border-t border-[#ede7dd]/80 pt-2">
-                  <span className="font-semibold text-emerald-700">
-                    {hyp.predictedLift}
-                  </span>
-                  <span className="font-mono text-[10px] text-[#8e8479]">
-                    {hyp.sampleSizeNote}
-                  </span>
+                  <p className="mt-2 text-xs font-semibold text-ink leading-snug line-clamp-2">
+                    {exp.title}
+                  </p>
+
+                  <div className="mt-2.5 flex items-center justify-between text-[11px] text-[#7a7167] border-t border-[#ede7dd]/80 pt-2">
+                    <span className="font-semibold text-emerald-700">
+                      Lift: {liftText}
+                    </span>
+                    <span className="font-mono text-[10px] text-[#8e8479]">
+                      {currentCount}/{targetCount} posts tracked
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -178,19 +233,27 @@ export function ExperimentBacklogWidget() {
                 </select>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="pt-2 flex items-center justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="rounded-xl px-4 py-2 text-xs font-semibold text-muted hover:bg-black/5"
+                  className="rounded-xl border border-line px-3.5 py-2 text-xs font-semibold text-muted hover:bg-cream"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white shadow hover:bg-brand-strong"
+                  disabled={isSubmitting}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white shadow hover:bg-brand-strong disabled:opacity-50"
                 >
-                  Add to Active Tests
+                  {isSubmitting ? (
+                    <span>Creating...</span>
+                  ) : (
+                    <>
+                      <Icon name="check" className="size-3.5" />
+                      <span>Save Hypothesis</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

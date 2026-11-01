@@ -4,7 +4,11 @@ import { useState } from "react";
 import { Icon } from "@/components/ui";
 import { CREATOR_PITFALLS, STRATEGIST_REVIEW } from "@/lib/data/growth-plan-mock-data";
 
-export function CreatorPitfallsSection() {
+type CreatorPitfallsSectionProps = {
+  channelTitle?: string;
+};
+
+export function CreatorPitfallsSection({ channelTitle }: CreatorPitfallsSectionProps) {
   const [reviewBooked, setReviewBooked] = useState(false);
   const [recalibrated, setRecalibrated] = useState(false);
 
@@ -22,7 +26,7 @@ export function CreatorPitfallsSection() {
               </h2>
             </div>
             <span className="rounded-full bg-rose-50 border border-rose-200/80 px-2.5 py-0.5 text-[11px] font-semibold text-rose-700">
-              Based on Nate&apos;s Bottom 5 Decile Uploads
+              {channelTitle ? `Based on ${channelTitle}'s Lower Decile Uploads` : "Based on Lower Decile Uploads"}
             </span>
           </div>
 

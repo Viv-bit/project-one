@@ -5,6 +5,7 @@ export const googleAuthUrl = `${apiUrl}/api/auth/google`;
 export const authSignupUrl = `${apiUrl}/api/auth/signup`;
 export const authSigninUrl = `${apiUrl}/api/auth/signin`;
 export const authLogoutUrl = `${apiUrl}/api/auth/logout`;
+export const authMeUrl = `${apiUrl}/api/auth/me`;
 export const youtubeConnectUrl = `${apiUrl}/api/youtube/connect`;
 export const youtubeConnectionUrl = `${apiUrl}/api/youtube/connection`;
 export const youtubeSyncUrl = `${apiUrl}/api/youtube/sync`;
@@ -18,6 +19,7 @@ export const creatorContentUrl = `${apiUrl}/api/creator/content`;
 export const insightsUrl = `${apiUrl}/api/insights`;
 export const recommendationsUrl = `${apiUrl}/api/recommendations`;
 export const experimentsUrl = `${apiUrl}/api/experiments`;
+export const benchmarksUrl = `${apiUrl}/api/benchmarks`;
 
 export type AuthUser = {
   id: string;
@@ -178,7 +180,8 @@ export async function apiFetch(
   const isExcludedAuthUrl =
     urlStr.includes("/api/auth/signin") ||
     urlStr.includes("/api/auth/signup") ||
-    urlStr.includes("/api/auth/logout");
+    urlStr.includes("/api/auth/logout") ||
+    urlStr.includes("/api/auth/me");
 
   if (!isExcludedAuthUrl && (await isAuthenticationError(response))) {
     await handleAuthError();

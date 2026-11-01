@@ -209,6 +209,12 @@ export function RoadmapKanbanBoard({
                 );
               })}
 
+              {colItems.length === 0 && col.key !== "future" && (
+                <div className="rounded-xl border border-dashed border-[#e6e0d6] p-4 text-center text-xs text-[#8a8075]">
+                  No features currently matching filter
+                </div>
+              )}
+
               {/* Edge Case Callout Card in Future Horizons */}
               {col.key === "future" && (
                 <div className="rounded-2xl border-2 border-dashed border-[#dcd4c7] bg-[#fbf9f6] p-4 text-center">
