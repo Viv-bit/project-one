@@ -14,7 +14,7 @@ function formatDuration(seconds?: number | null): string {
 }
 
 export function ContentSplitCard() {
-  const { isConnected } = useYouTubeConnection();
+  const { isConnected, syncVersion, isAutoSyncing } = useYouTubeConnection();
   const [videos, setVideos] = useState<YouTubeVideoItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -38,7 +38,7 @@ export function ContentSplitCard() {
     return () => {
       isMounted = false;
     };
-  }, [isConnected]);
+  }, [isConnected, syncVersion]);
 
   // Empty state when YouTube is not connected OR fewer than 2 videos are synced
   if (!isConnected || videos.length < 2) {
@@ -52,7 +52,7 @@ export function ContentSplitCard() {
                 Top vs Underperforming Content Split
               </h2>
               <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-                {!isConnected ? "Awaiting Connection" : "Need 2+ Ingested Videos"}
+                {isAutoSyncing ? "Syncing Videos..." : !isConnected ? "Awaiting Connection" : "Need 2+ Ingested Videos"}
               </span>
             </div>
             <p className="text-xs text-[#82786e]">

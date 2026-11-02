@@ -9,7 +9,7 @@ import { useYouTubeConnection } from "@/lib/youtube-connection-context";
 import { CreateExperimentModal } from "@/components/dashboard/create-experiment-modal";
 
 export function EvidenceOpportunitiesCard() {
-  const { isConnected } = useYouTubeConnection();
+  const { isConnected, syncVersion, isAutoSyncing } = useYouTubeConnection();
   const [recommendations, setRecommendations] = useState<ApiRecommendation[]>([]);
   const [activeModalItem, setActiveModalItem] = useState<ApiRecommendation | null>(null);
   const [isExperimentModalOpen, setIsExperimentModalOpen] = useState(false);
@@ -35,7 +35,7 @@ export function EvidenceOpportunitiesCard() {
     return () => {
       isMounted = false;
     };
-  }, [isConnected]);
+  }, [isConnected, syncVersion]);
 
   // Empty state when YouTube is not connected OR when no opportunities generated yet
   if (!isConnected || recommendations.length === 0) {
@@ -52,7 +52,7 @@ export function EvidenceOpportunitiesCard() {
             </h2>
           </div>
           <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-            {!isConnected ? "Awaiting Ingestion" : "Sync & Analyze"}
+            {isAutoSyncing ? "Analyzing Channel..." : !isConnected ? "Awaiting Ingestion" : "Sync & Analyze"}
           </span>
         </div>
 

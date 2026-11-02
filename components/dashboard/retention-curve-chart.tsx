@@ -17,7 +17,7 @@ const X_AXIS_TICKS = [
 ] as const;
 
 export function RetentionCurveChart() {
-  const { isConnected } = useYouTubeConnection();
+  const { isConnected, syncVersion, isAutoSyncing } = useYouTubeConnection();
   const [hasVideos, setHasVideos] = useState<boolean | null>(null);
   const [selectedFormat, setSelectedFormat] = useState<RetentionFormat>("all");
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
@@ -38,7 +38,7 @@ export function RetentionCurveChart() {
     return () => {
       isMounted = false;
     };
-  }, [isConnected]);
+  }, [isConnected, syncVersion]);
 
   // SVG dimensions & coordinate calculations
   const width = 640;
@@ -106,7 +106,7 @@ export function RetentionCurveChart() {
                 Retention &amp; Hook Velocity Curve
               </h2>
               <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-                {!isConnected ? "Awaiting Connection" : "Sync Required"}
+                {isAutoSyncing ? "Syncing Uploads..." : !isConnected ? "Awaiting Connection" : "Sync Required"}
               </span>
             </div>
             <p className="text-xs text-[#82786e]">

@@ -8,7 +8,7 @@ import { formatCount, startYouTubeOAuth } from "@/lib/youtube";
 import { useYouTubeConnection } from "@/lib/youtube-connection-context";
 
 export function KpiMetricCards() {
-  const { isConnected } = useYouTubeConnection();
+  const { isConnected, syncVersion, isAutoSyncing } = useYouTubeConnection();
   const [overview, setOverview] = useState<CreatorOverviewResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -32,7 +32,7 @@ export function KpiMetricCards() {
     return () => {
       isMounted = false;
     };
-  }, [isConnected]);
+  }, [isConnected, syncVersion]);
 
   const hasVideos = Boolean(overview?.totals?.totalVideos && overview.totals.totalVideos > 0);
 
@@ -55,14 +55,33 @@ export function KpiMetricCards() {
             <span className="font-serif text-3xl sm:text-4xl font-normal tracking-tight text-[#c2b6a8]">
               —
             </span>
-            <span className="inline-flex items-center rounded-full bg-[#f4ede3] text-[#7d7367] px-2 py-0.5 text-[11px] font-medium">
-              {!isConnected ? "Awaiting Channel" : "Sync Required"}
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#f4ede3] text-[#7d7367] px-2 py-0.5 text-[11px] font-medium">
+              {isAutoSyncing ? (
+                <>
+                  <Icon name="refresh" className="size-2.5 animate-spin text-brand" />
+                  <span>Syncing...</span>
+                </>
+              ) : !isConnected ? (
+                "Awaiting Channel"
+              ) : (
+                "Sync Required"
+              )}
             </span>
           </div>
 
           <div className="mt-3 pt-2.5 border-t border-[#f2ede4] flex items-center justify-between text-xs text-[#9c9185]">
-            <span>{!isConnected ? "Requires YouTube link" : "0 videos synced"}</span>
-            {!isConnected ? (
+            <span>
+              {isAutoSyncing
+                ? "Importing latest uploads..."
+                : !isConnected
+                  ? "Requires YouTube link"
+                  : "0 videos synced"}
+            </span>
+            {isAutoSyncing ? (
+              <span className="font-medium text-brand inline-flex items-center gap-1 text-[11px]">
+                <Icon name="refresh" className="size-3 animate-spin" /> Auto-syncing
+              </span>
+            ) : !isConnected ? (
               <button
                 onClick={() => startYouTubeOAuth()}
                 className="font-medium text-brand hover:underline"

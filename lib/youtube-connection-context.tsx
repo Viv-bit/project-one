@@ -22,6 +22,9 @@ type YouTubeConnectionContextValue = {
   // Demo mode toggle for previewing empty vs populated states
   isDemoMode: boolean;
   toggleDemoMode: () => void;
+  // Automatic sync status
+  isAutoSyncing: boolean;
+  syncVersion: number;
 };
 
 const YouTubeConnectionContext = createContext<
@@ -38,6 +41,8 @@ export function YouTubeConnectionProvider({
     useState<YouTubeConnectionState | null>({ connected: false });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAutoSyncing, setIsAutoSyncing] = useState(false);
+  const [syncVersion, setSyncVersion] = useState(0);
   const [isDemoMode, setIsDemoMode] = useState(() => {
     if (typeof window !== "undefined") {
       return new URLSearchParams(window.location.search).get("demo") === "connected";
@@ -88,6 +93,52 @@ export function YouTubeConnectionProvider({
         : null
     : null;
 
+  // Auto-sync trigger when channel is connected but has 0 videos synced
+  useEffect(() => {
+    if (!isConnected || isDemoMode || isAutoSyncing) return;
+
+    let isMounted = true;
+    async function checkAndAutoSync() {
+      try {
+        const { getYouTubeVideos, syncYouTubeVideos } = await import("./youtube");
+        const videos = await getYouTubeVideos();
+        if (!isMounted) return;
+
+        if (Array.isArray(videos) && videos.length === 0) {
+          const channelId = channel?.id || connectionState?.channel?.id || "default";
+          const storageKey = `yt_autosync_attempted_${channelId}`;
+
+          if (typeof window !== "undefined" && !sessionStorage.getItem(storageKey)) {
+            sessionStorage.setItem(storageKey, "true");
+            setIsAutoSyncing(true);
+
+            try {
+              await syncYouTubeVideos({ count: 20, classify: true });
+              if (isMounted) {
+                setSyncVersion((v) => v + 1);
+                void fetchConnection();
+              }
+            } catch (syncErr) {
+              console.warn("Background auto-sync failed:", syncErr);
+            } finally {
+              if (isMounted) {
+                setIsAutoSyncing(false);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Auto-sync check encountered an error:", err);
+      }
+    }
+
+    void checkAndAutoSync();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isConnected, isDemoMode, isAutoSyncing, channel?.id, connectionState?.channel?.id, fetchConnection]);
+
   return (
     <YouTubeConnectionContext.Provider
       value={{
@@ -100,6 +151,8 @@ export function YouTubeConnectionProvider({
         connectYouTube: startYouTubeOAuth,
         isDemoMode,
         toggleDemoMode,
+        isAutoSyncing,
+        syncVersion,
       }}
     >
       {children}

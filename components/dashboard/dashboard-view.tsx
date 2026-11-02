@@ -13,7 +13,7 @@ import { DashboardConnectBanner } from "@/components/dashboard/dashboard-connect
 import { Icon } from "@/components/ui";
 
 export function DashboardView() {
-  const { isLoading, isConnected, isDemoMode, toggleDemoMode } =
+  const { isLoading, isConnected, isDemoMode, toggleDemoMode, isAutoSyncing } =
     useYouTubeConnection();
 
   if (isLoading) {
@@ -57,6 +57,29 @@ export function DashboardView() {
           onDemoToggle={toggleDemoMode}
           isDemoMode={isDemoMode}
         />
+      )}
+
+      {/* Auto-sync banner when sync is running in the background */}
+      {isAutoSyncing && (
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-brand/20 bg-brand/5 px-4 py-3 text-sm text-ink animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <div className="grid size-7 place-items-center rounded-lg bg-brand text-white shadow-sm">
+              <Icon name="refresh" className="size-3.5 animate-spin" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-brand">
+                Syncing channel data in background...
+              </p>
+              <p className="text-[11px] text-[#73695d]">
+                Importing your latest uploads and computing AI features. This page will update automatically.
+              </p>
+            </div>
+          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-2.5 py-0.5 text-[10px] font-semibold text-brand">
+            <span className="size-1.5 rounded-full bg-brand animate-pulse" />
+            Auto-syncing
+          </span>
+        </div>
       )}
 
       {/* Channel Header Banner (renders empty state when !isConnected) */}

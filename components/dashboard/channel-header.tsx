@@ -7,7 +7,7 @@ import { formatCount, startYouTubeOAuth } from "@/lib/youtube";
 import { useYouTubeConnection } from "@/lib/youtube-connection-context";
 
 export function ChannelHeader() {
-  const { isConnected, channel } = useYouTubeConnection();
+  const { isConnected, channel, syncVersion } = useYouTubeConnection();
   const [profileData, setProfileData] = useState<CreatorProfileResponse | null>(null);
   const [baselineOption, setBaselineOption] = useState("Past 16 Posts Baseline");
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -33,7 +33,7 @@ export function ChannelHeader() {
       }
     }
     fetchProfile();
-  }, [isConnected]);
+  }, [isConnected, syncVersion]);
 
   // When NOT connected, show dedicated empty state
   if (!isConnected) {
