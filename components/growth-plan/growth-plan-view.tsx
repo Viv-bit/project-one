@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui";
 import { useYouTubeConnection } from "@/lib/youtube-connection-context";
-import { getCreatorProfile, type CreatorProfileResponse } from "@/lib/creator";
-import { getYouTubeVideos, type YouTubeVideoItem } from "@/lib/youtube";
-import { getRecommendations, type ApiRecommendation } from "@/lib/insights";
+import {
+  useCreatorProfileQuery,
+  useYouTubeVideosQuery,
+  useRecommendationsQuery,
+} from "@/lib/queries";
 import { GrowthPlanHeader } from "./growth-plan-header";
 import { HorizonObjectiveCard } from "./horizon-objective-card";
 import { AlgorithmicLeversSection } from "./algorithmic-levers-section";
@@ -61,51 +62,19 @@ function calculateMilestone(subs: number) {
 
 export function GrowthPlanView() {
   const { isConnected, channel, connectYouTube } = useYouTubeConnection();
-  const [profile, setProfile] = useState<CreatorProfileResponse | null>(null);
-  const [videos, setVideos] = useState<YouTubeVideoItem[]>([]);
-  const [recommendations, setRecommendations] = useState<ApiRecommendation[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    let isMounted = true;
+  const { data: profile, isLoading: isProfileLoading } = useCreatorProfileQuery({
+    enabled: isConnected,
+  });
+  const { data: videos = [], isLoading: isVideosLoading } = useYouTubeVideosQuery(undefined, {
+    enabled: isConnected,
+  });
+  const { data: recsData, isLoading: isRecsLoading } = useRecommendationsQuery({
+    enabled: isConnected,
+  });
 
-    async function loadData() {
-      if (!isConnected) {
-        setIsLoading(false);
-        return;
-      }
-      setIsLoading(true);
-      try {
-        const [profileRes, videosRes, recsRes] = await Promise.allSettled([
-          getCreatorProfile(),
-          getYouTubeVideos(),
-          getRecommendations(),
-        ]);
-
-        if (isMounted) {
-          if (profileRes.status === "fulfilled" && profileRes.value) {
-            setProfile(profileRes.value);
-          }
-          if (videosRes.status === "fulfilled" && Array.isArray(videosRes.value)) {
-            setVideos(videosRes.value);
-          }
-          if (recsRes.status === "fulfilled" && recsRes.value) {
-            setRecommendations(recsRes.value.recommendations ?? []);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to load growth plan dependencies:", err);
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    }
-
-    void loadData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isConnected]);
+  const recommendations = recsData?.recommendations ?? [];
+  const isLoading = isConnected && (isProfileLoading || isVideosLoading || isRecsLoading);
 
   // Loading state skeleton
   if (isLoading) {

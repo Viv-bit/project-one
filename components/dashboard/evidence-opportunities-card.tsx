@@ -1,41 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui";
-import { getRecommendations, type ApiRecommendation } from "@/lib/insights";
+import { useRecommendationsQuery } from "@/lib/queries";
+import { type ApiRecommendation } from "@/lib/insights";
 import { startYouTubeOAuth } from "@/lib/youtube";
 import { useYouTubeConnection } from "@/lib/youtube-connection-context";
 import { CreateExperimentModal } from "@/components/dashboard/create-experiment-modal";
 
 export function EvidenceOpportunitiesCard() {
-  const { isConnected, syncVersion, isAutoSyncing } = useYouTubeConnection();
-  const [recommendations, setRecommendations] = useState<ApiRecommendation[]>([]);
+  const { isConnected, isAutoSyncing } = useYouTubeConnection();
   const [activeModalItem, setActiveModalItem] = useState<ApiRecommendation | null>(null);
   const [isExperimentModalOpen, setIsExperimentModalOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    let isMounted = true;
-    async function load() {
-      if (!isConnected) return;
-      setIsLoading(true);
-      try {
-        const data = await getRecommendations();
-        if (isMounted && data && Array.isArray(data.recommendations)) {
-          setRecommendations(data.recommendations);
-        }
-      } catch (err) {
-        console.warn("Failed to fetch recommendations:", err);
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    }
-    load();
-    return () => {
-      isMounted = false;
-    };
-  }, [isConnected, syncVersion]);
+  const { data, isLoading } = useRecommendationsQuery({
+    enabled: isConnected,
+  });
+  const recommendations = data?.recommendations ?? [];
 
   // Empty state when YouTube is not connected OR when no opportunities generated yet
   if (!isConnected || recommendations.length === 0) {

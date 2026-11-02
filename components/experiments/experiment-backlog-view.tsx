@@ -1,23 +1,27 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Icon } from "@/components/ui/icon";
 import type { ExperimentRecord } from "@/lib/types/creator-intelligence";
 import { CreateExperimentModal } from "@/components/dashboard/create-experiment-modal";
 import {
-  getExperiments,
   evaluateExperimentResults,
   updateExperiment,
   linkPostToExperiment,
   type ApiExperiment,
   type ExperimentStatus,
 } from "@/lib/experiments";
-import { getYouTubeVideos, type YouTubeVideoItem, formatCount } from "@/lib/youtube";
+import { formatCount } from "@/lib/youtube";
+import { useExperimentsQuery, useYouTubeVideosQuery } from "@/lib/queries";
+import { queryKeys } from "@/lib/query-keys";
 
 export function ExperimentBacklogView() {
-  const [experiments, setExperiments] = useState<ExperimentRecord[]>([]);
-  const [userVideos, setUserVideos] = useState<YouTubeVideoItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: rawExperiments = [], isLoading: isExperimentsLoading } = useExperimentsQuery();
+  const { data: userVideos = [], isLoading: isVideosLoading } = useYouTubeVideosQuery();
+  const isLoading = isExperimentsLoading || isVideosLoading;
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "validated" | "inconclusive">("all");
   const [evaluatingId, setEvaluatingId] = useState<string | null>(null);
@@ -25,89 +29,59 @@ export function ExperimentBacklogView() {
   const [selectedPostToLink, setSelectedPostToLink] = useState<string>("");
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
-    async function load() {
-      setIsLoading(true);
-      try {
-        const [data, videos] = await Promise.all([
-          getExperiments().catch(() => []),
-          getYouTubeVideos().catch(() => []),
-        ]);
+  const experiments: ExperimentRecord[] = useMemo(() => {
+    return rawExperiments.map((exp: ApiExperiment, idx: number) => {
+      const currentCount = exp.posts?.length ?? exp.progress?.currentPostsCount ?? 0;
+      const targetCount = exp.targetPostCount ?? 3;
+      const isSuff = currentCount >= targetCount;
+      const liftVal = exp.result?.deltaPercent ?? exp.liftPct ?? 0;
+      const isPos = liftVal > 0;
 
-        if (!isMounted) return;
-
-        if (Array.isArray(videos)) {
-          setUserVideos(videos);
-        }
-
-        if (Array.isArray(data)) {
-          const mapped: ExperimentRecord[] = data.map((exp: ApiExperiment, idx: number) => {
-            const currentCount = exp.posts?.length ?? exp.progress?.currentPostsCount ?? 0;
-            const targetCount = exp.targetPostCount ?? 3;
-            const isSuff = currentCount >= targetCount;
-            const liftVal = exp.result?.deltaPercent ?? exp.liftPct ?? 0;
-            const isPos = liftVal > 0;
-
-            let status: ExperimentRecord["status"] = "active";
-            if (exp.result) {
-              status = exp.result.conclusion === "POSITIVE" ? "validated" : "inconclusive";
-            } else if (exp.status === "COMPLETED") {
-              status = isPos ? "validated" : "inconclusive";
-            }
-
-            return {
-              id: exp.id,
-              experimentNumber: idx + 1,
-              title: exp.title,
-              hypothesis: exp.hypothesis,
-              status,
-              primaryMetric: exp.primaryMetric === "median_views" ? "Median Views" : "Engagement Rate",
-              baselineValueFormatted: exp.baselineMetricValue
-                ? exp.primaryMetric === "engagement_rate"
-                  ? `${exp.baselineMetricValue.toFixed(1)}%`
-                  : `${Math.round(exp.baselineMetricValue).toLocaleString()} views`
-                : "Baseline Calibrated",
-              currentValueFormatted: exp.result?.experimentValue
-                ? exp.primaryMetric === "engagement_rate"
-                  ? `${exp.result.experimentValue.toFixed(1)}%`
-                  : `${Math.round(exp.result.experimentValue).toLocaleString()} views`
-                : currentCount === 0
-                ? "Pending 1st Upload"
-                : `${currentCount} Uploads Tracked`,
-              liftPctFormatted: exp.result
-                ? `${exp.result.deltaPercent >= 0 ? "+" : ""}${exp.result.deltaPercent.toFixed(1)}%`
-                : currentCount >= targetCount
-                ? "Ready for Evaluation"
-                : "0.0%",
-              targetPostCount: targetCount,
-              currentPostCount: currentCount,
-              durationDays: exp.durationDays ?? 14,
-              daysElapsed: exp.progress?.daysElapsed ?? 1,
-              startDate: exp.startDate ? exp.startDate.slice(0, 10) : "Today",
-              linkedPostIds: exp.posts?.map((p) => p.postId) ?? [],
-              notes: exp.result?.summary ?? (
-                isSuff
-                  ? "Data Sufficiency Rule met! Ready to evaluate empirical outcome."
-                  : `Awaiting ${targetCount - currentCount} more upload(s) to satisfy Data Sufficiency Rule (N>=${targetCount}).`
-              ),
-            };
-          });
-
-          setExperiments(mapped);
-        }
-      } catch (err) {
-        console.warn("Failed to load experiments:", err);
-      } finally {
-        if (isMounted) setIsLoading(false);
+      let status: ExperimentRecord["status"] = "active";
+      if (exp.result) {
+        status = exp.result.conclusion === "POSITIVE" ? "validated" : "inconclusive";
+      } else if (exp.status === "COMPLETED") {
+        status = isPos ? "validated" : "inconclusive";
       }
-    }
 
-    load();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+      return {
+        id: exp.id,
+        experimentNumber: idx + 1,
+        title: exp.title,
+        hypothesis: exp.hypothesis,
+        status,
+        primaryMetric: exp.primaryMetric === "median_views" ? "Median Views" : "Engagement Rate",
+        baselineValueFormatted: exp.baselineMetricValue
+          ? exp.primaryMetric === "engagement_rate"
+            ? `${exp.baselineMetricValue.toFixed(1)}%`
+            : `${Math.round(exp.baselineMetricValue).toLocaleString()} views`
+          : "Baseline Calibrated",
+        currentValueFormatted: exp.result?.experimentValue
+          ? exp.primaryMetric === "engagement_rate"
+            ? `${exp.result.experimentValue.toFixed(1)}%`
+            : `${Math.round(exp.result.experimentValue).toLocaleString()} views`
+          : currentCount === 0
+          ? "Pending 1st Upload"
+          : `${currentCount} Uploads Tracked`,
+        liftPctFormatted: exp.result
+          ? `${exp.result.deltaPercent >= 0 ? "+" : ""}${exp.result.deltaPercent.toFixed(1)}%`
+          : currentCount >= targetCount
+          ? "Ready for Evaluation"
+          : "0.0%",
+        targetPostCount: targetCount,
+        currentPostCount: currentCount,
+        durationDays: exp.durationDays ?? 14,
+        daysElapsed: exp.progress?.daysElapsed ?? 1,
+        startDate: exp.startDate ? exp.startDate.slice(0, 10) : "Today",
+        linkedPostIds: exp.posts?.map((p) => p.postId) ?? [],
+        notes: exp.result?.summary ?? (
+          isSuff
+            ? "Data Sufficiency Rule met! Ready to evaluate empirical outcome."
+            : `Awaiting ${targetCount - currentCount} more upload(s) to satisfy Data Sufficiency Rule (N>=${targetCount}).`
+        ),
+      };
+    });
+  }, [rawExperiments]);
 
   async function handleEvaluate(expId: string) {
     try {
@@ -119,22 +93,7 @@ export function ExperimentBacklogView() {
         `Evaluation complete: ${result.conclusion} (${result.deltaPercent >= 0 ? "+" : ""}${result.deltaPercent.toFixed(1)}% lift)!`
       );
 
-      // Update in local state
-      setExperiments((prev) =>
-        prev.map((e) => {
-          if (e.id === expId) {
-            return {
-              ...e,
-              status: result.conclusion === "POSITIVE" ? "validated" : "inconclusive",
-              liftPctFormatted: `${result.deltaPercent >= 0 ? "+" : ""}${result.deltaPercent.toFixed(1)}%`,
-              currentValueFormatted: `${Math.round(result.experimentValue).toLocaleString()} views`,
-              notes: result.summary,
-            };
-          }
-          return e;
-        })
-      );
-
+      await queryClient.invalidateQueries({ queryKey: queryKeys.experiments.all });
       setTimeout(() => setActionFeedback(null), 4500);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Evaluation failed";
@@ -148,17 +107,7 @@ export function ExperimentBacklogView() {
   async function handleStatusChange(expId: string, newStatus: ExperimentStatus) {
     try {
       await updateExperiment(expId, { status: newStatus });
-      setExperiments((prev) =>
-        prev.map((e) => {
-          if (e.id === expId) {
-            return {
-              ...e,
-              status: newStatus === "COMPLETED" ? "validated" : "active",
-            };
-          }
-          return e;
-        })
-      );
+      await queryClient.invalidateQueries({ queryKey: queryKeys.experiments.all });
     } catch (err) {
       console.warn("Update status error:", err);
     }
@@ -170,24 +119,7 @@ export function ExperimentBacklogView() {
     try {
       setActionFeedback("Attaching video to experiment cohort...");
       await linkPostToExperiment(linkingExperimentId, selectedPostToLink);
-
-      setExperiments((prev) =>
-        prev.map((e) => {
-          if (e.id === linkingExperimentId) {
-            const nextCount = e.currentPostCount + 1;
-            const isSuff = nextCount >= e.targetPostCount;
-            return {
-              ...e,
-              currentPostCount: nextCount,
-              linkedPostIds: [...e.linkedPostIds, selectedPostToLink],
-              notes: isSuff
-                ? "Data Sufficiency Rule met! Ready to evaluate empirical outcome."
-                : `Awaiting ${e.targetPostCount - nextCount} more upload(s) to satisfy Data Sufficiency Rule.`,
-            };
-          }
-          return e;
-        })
-      );
+      await queryClient.invalidateQueries({ queryKey: queryKeys.experiments.all });
 
       setActionFeedback("Video linked successfully!");
       setLinkingExperimentId(null);
@@ -200,34 +132,8 @@ export function ExperimentBacklogView() {
     }
   }
 
-  function handleExperimentCreated(newExp: {
-    id?: string;
-    title: string;
-    hypothesis: string;
-    primaryMetric: string;
-    targetPostCount: number;
-    durationDays: number;
-  }) {
-    const newRecord: ExperimentRecord = {
-      id: newExp.id || `exp-local-${Date.now()}`,
-      experimentNumber: experiments.length + 1,
-      title: newExp.title,
-      hypothesis: newExp.hypothesis,
-      status: "active",
-      primaryMetric: newExp.primaryMetric === "median_views" ? "Median Views" : "Engagement Rate",
-      baselineValueFormatted: "Baseline Calibrated",
-      currentValueFormatted: "Pending 1st Upload",
-      liftPctFormatted: "0.0%",
-      targetPostCount: newExp.targetPostCount,
-      currentPostCount: 0,
-      durationDays: newExp.durationDays,
-      daysElapsed: 1,
-      startDate: new Date().toISOString().slice(0, 10),
-      linkedPostIds: [],
-      notes: `Awaiting ${newExp.targetPostCount} upload(s) to satisfy Data Sufficiency Rule.`,
-    };
-
-    setExperiments((prev) => [newRecord, ...prev]);
+  function handleExperimentCreated() {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.experiments.all });
     setActionFeedback("New experiment cohort created successfully!");
     setTimeout(() => setActionFeedback(null), 3500);
   }

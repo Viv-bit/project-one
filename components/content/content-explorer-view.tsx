@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui/icon";
 import type { IngestedVideoPost } from "@/lib/types/creator-intelligence";
 import { PostInspectionDrawer } from "./post-inspection-drawer";
-import { getCreatorContent, type CreatorContentResponse, type ContentDimensionItem } from "@/lib/creator";
-import { getYouTubeVideos, formatCount, type YouTubeVideoItem } from "@/lib/youtube";
+import { type CreatorContentResponse, type ContentDimensionItem } from "@/lib/creator";
+import { formatCount, type YouTubeVideoItem } from "@/lib/youtube";
+import { useCreatorContentQuery, useYouTubeVideosQuery } from "@/lib/queries";
 
 type ViewMode = "posts" | "breakdowns";
 type DimensionSlice = "byTopic" | "byHookType" | "byPillar" | "byDurationTier" | "byDayOfWeek";
@@ -102,50 +103,20 @@ function mapVideoToPost(
 export function ContentExplorerView() {
   const [viewMode, setViewMode] = useState<ViewMode>("posts");
   const [activeDimension, setActiveDimension] = useState<DimensionSlice>("byTopic");
-  const [breakdownData, setBreakdownData] = useState<CreatorContentResponse>(EMPTY_BREAKDOWNS);
-  const [posts, setPosts] = useState<IngestedVideoPost[]>([]);
   const [selectedPost, setSelectedPost] = useState<IngestedVideoPost | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [hookFilter, setHookFilter] = useState<HookFilter>("all");
   const [tierFilter, setTierFilter] = useState<TierFilter>("all");
   const [sortBy, setSortBy] = useState<SortOption>("views");
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    let isMounted = true;
+  const { data: rawContent, isLoading: isContentLoading } = useCreatorContentQuery();
+  const { data: rawVideos = [], isLoading: isVideosLoading } = useYouTubeVideosQuery();
+  const isLoading = isContentLoading || isVideosLoading;
 
-    async function loadData() {
-      setIsLoading(true);
-      try {
-        const [contentRes, videosRes] = await Promise.allSettled([
-          getCreatorContent(),
-          getYouTubeVideos(),
-        ]);
-
-        if (!isMounted) return;
-
-        if (contentRes.status === "fulfilled" && contentRes.value && Object.keys(contentRes.value).length > 0) {
-          setBreakdownData(contentRes.value);
-        }
-
-        if (videosRes.status === "fulfilled" && Array.isArray(videosRes.value)) {
-          const rawVideos = videosRes.value;
-          const mapped = rawVideos.map((v, i) => mapVideoToPost(v, i, rawVideos));
-          setPosts(mapped);
-        }
-      } catch (err) {
-        console.warn("Failed to load content explorer data:", err);
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    }
-
-    loadData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const breakdownData = rawContent ?? EMPTY_BREAKDOWNS;
+  const posts = useMemo(() => {
+    return rawVideos.map((v, i) => mapVideoToPost(v, i, rawVideos));
+  }, [rawVideos]);
 
   const filteredPosts = posts.filter((post) => {
     const matchesSearch =

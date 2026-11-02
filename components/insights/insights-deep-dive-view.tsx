@@ -1,18 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui/icon";
 import type { DetailedInsight } from "@/lib/types/creator-intelligence";
 import { CreateExperimentModal } from "@/components/dashboard/create-experiment-modal";
 import {
-  getInsights,
-  getRecommendations,
   type ApiInsight,
   type ApiRecommendation,
   type InsightPriority,
 } from "@/lib/insights";
-import { getYouTubeVideos, type YouTubeVideoItem, formatCount } from "@/lib/youtube";
+import { formatCount } from "@/lib/youtube";
+import {
+  useInsightsQuery,
+  useRecommendationsQuery,
+  useYouTubeVideosQuery,
+} from "@/lib/queries";
 
 type FilterPriority = "ALL" | InsightPriority;
 type FilterCategory =
@@ -25,9 +28,6 @@ type FilterCategory =
   | "CADENCE";
 
 export function InsightsDeepDiveView() {
-  const [insights, setInsights] = useState<DetailedInsight[]>([]);
-  const [userVideos, setUserVideos] = useState<YouTubeVideoItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [selectedInsightForExp, setSelectedInsightForExp] =
     useState<DetailedInsight | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -35,88 +35,58 @@ export function InsightsDeepDiveView() {
   const [priorityFilter, setPriorityFilter] = useState<FilterPriority>("ALL");
   const [categoryFilter, setCategoryFilter] = useState<FilterCategory>("ALL");
 
-  useEffect(() => {
-    let ignore = false;
-    async function load() {
-      setIsLoading(true);
-      try {
-        const [insightsRes, recsRes, videosRes] = await Promise.allSettled([
-          getInsights({
-            ...(priorityFilter !== "ALL" && { priority: priorityFilter }),
-            ...(categoryFilter !== "ALL" && { category: categoryFilter }),
-          }),
-          getRecommendations(),
-          getYouTubeVideos(),
-        ]);
+  const { data: insightsData, isLoading: isInsightsLoading } = useInsightsQuery({
+    ...(priorityFilter !== "ALL" && { priority: priorityFilter }),
+    ...(categoryFilter !== "ALL" && { category: categoryFilter }),
+  });
+  const { data: recsData, isLoading: isRecsLoading } = useRecommendationsQuery();
+  const { data: userVideos = [], isLoading: isVideosLoading } = useYouTubeVideosQuery();
 
-        if (ignore) return;
+  const isLoading = isInsightsLoading || isRecsLoading || isVideosLoading;
 
-        if (videosRes.status === "fulfilled" && Array.isArray(videosRes.value)) {
-          setUserVideos(videosRes.value);
-        }
+  const insights: DetailedInsight[] = useMemo(() => {
+    if (!insightsData?.insights) return [];
+    const recsList: ApiRecommendation[] = recsData?.recommendations ?? [];
 
-        if (insightsRes.status === "fulfilled" && insightsRes.value?.insights) {
-          const recsList: ApiRecommendation[] =
-            recsRes.status === "fulfilled" && recsRes.value?.recommendations
-              ? recsRes.value.recommendations
-              : [];
+    return insightsData.insights.map((ins: ApiInsight) => {
+      const matchingRec = recsList.find(
+        (r) => r.id === `rec-${ins.id}` || r.category === ins.category
+      );
 
-          const mapped: DetailedInsight[] = insightsRes.value.insights.map((ins: ApiInsight) => {
-            const matchingRec = recsList.find(
-              (r) => r.id === `rec-${ins.id}` || r.category === ins.category
-            );
+      let mappedCategory: DetailedInsight["category"] = "topic";
+      if (ins.category.includes("HOOK")) mappedCategory = "hook";
+      else if (ins.category.includes("DURATION")) mappedCategory = "duration";
+      else if (ins.category.includes("PACING")) mappedCategory = "pacing";
+      else if (ins.category.includes("CTA")) mappedCategory = "cta";
 
-            let mappedCategory: DetailedInsight["category"] = "topic";
-            if (ins.category.includes("HOOK")) mappedCategory = "hook";
-            else if (ins.category.includes("DURATION")) mappedCategory = "duration";
-            else if (ins.category.includes("PACING")) mappedCategory = "pacing";
-            else if (ins.category.includes("CTA")) mappedCategory = "cta";
-
-            return {
-              id: ins.id,
-              category: mappedCategory,
-              priority: ins.priority.toLowerCase() as DetailedInsight["priority"],
-              title: ins.title,
-              observation: ins.observation,
-              evidenceMetric: ins.evidence.metric,
-              evidenceCreatorValue: String(ins.evidence.creatorValue),
-              evidenceBenchmarkValue: ins.evidence.baselineValue
-                ? String(ins.evidence.baselineValue)
-                : "+25% benchmark",
-              sampleSizeLabel: `Calculated over ${ins.evidence.sampleSize} verified uploads (${ins.evidence.deltaPercent ? `+${ins.evidence.deltaPercent}% lift` : "empirical baseline"})`,
-              linkedPostIds: ins.evidence.sourcePostIds || [],
-              interpretation: ins.interpretation || matchingRec?.why || "Audience retention signals confirm algorithmic lift.",
-              recommendation: ins.recommendation || matchingRec?.action || "Run a 3-video experiment cohort.",
-              confidenceScore: Math.round(ins.confidence * 100),
-              suggestedExperiment: matchingRec?.experimentTemplate
-                ? {
-                    hypothesis: matchingRec.experimentTemplate.hypothesis,
-                    suggestedDurationDays: matchingRec.experimentTemplate.suggestedDurationDays,
-                    targetPostCount: matchingRec.experimentTemplate.targetPostCount,
-                    primaryMetric: matchingRec.experimentTemplate.primaryMetric,
-                    predictedLift: `+${ins.evidence.deltaPercent ?? 25}%`,
-                  }
-                : undefined,
-            };
-          });
-
-          setInsights(mapped);
-          if (mapped.length > 0 && !expandedInsightId) {
-            setExpandedInsightId(mapped[0].id);
-          }
-        }
-      } catch (err) {
-        console.warn("Failed to load insights:", err);
-      } finally {
-        if (!ignore) setIsLoading(false);
-      }
-    }
-
-    load();
-    return () => {
-      ignore = true;
-    };
-  }, [priorityFilter, categoryFilter]);
+      return {
+        id: ins.id,
+        category: mappedCategory,
+        priority: ins.priority.toLowerCase() as DetailedInsight["priority"],
+        title: ins.title,
+        observation: ins.observation,
+        evidenceMetric: ins.evidence.metric,
+        evidenceCreatorValue: String(ins.evidence.creatorValue),
+        evidenceBenchmarkValue: ins.evidence.baselineValue
+          ? String(ins.evidence.baselineValue)
+          : "+25% benchmark",
+        sampleSizeLabel: `Calculated over ${ins.evidence.sampleSize} verified uploads (${ins.evidence.deltaPercent ? `+${ins.evidence.deltaPercent}% lift` : "empirical baseline"})`,
+        linkedPostIds: ins.evidence.sourcePostIds || [],
+        interpretation: ins.interpretation || matchingRec?.why || "Audience retention signals confirm algorithmic lift.",
+        recommendation: ins.recommendation || matchingRec?.action || "Run a 3-video experiment cohort.",
+        confidenceScore: Math.round(ins.confidence * 100),
+        suggestedExperiment: matchingRec?.experimentTemplate
+          ? {
+              hypothesis: matchingRec.experimentTemplate.hypothesis,
+              suggestedDurationDays: matchingRec.experimentTemplate.suggestedDurationDays,
+              targetPostCount: matchingRec.experimentTemplate.targetPostCount,
+              primaryMetric: matchingRec.experimentTemplate.primaryMetric,
+              predictedLift: `+${ins.evidence.deltaPercent ?? 25}%`,
+            }
+          : undefined,
+      };
+    });
+  }, [insightsData, recsData]);
 
   function handleLaunchExperiment(insight: DetailedInsight) {
     setSelectedInsightForExp(insight);

@@ -8,6 +8,8 @@ import React, {
   useCallback,
   type ReactNode,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "./query-keys";
 import { type YouTubeConnectionState, type YouTubeChannel } from "./api";
 import { getYouTubeConnection, startYouTubeOAuth } from "./youtube";
 
@@ -36,6 +38,8 @@ export function YouTubeConnectionProvider({
 }: {
   children: ReactNode;
 }) {
+  const queryClient = useQueryClient();
+
   // Default to unconnected empty state so new users and initial render immediately display empty state
   const [connectionState, setConnectionState] =
     useState<YouTubeConnectionState | null>({ connected: false });
@@ -52,9 +56,12 @@ export function YouTubeConnectionProvider({
 
   const fetchConnection = useCallback(async () => {
     setError(null);
+    setIsLoading(true);
     try {
       const data = await getYouTubeConnection();
       setConnectionState(data);
+      // Keep TanStack query cache synchronized
+      queryClient.setQueryData(queryKeys.youtube.connection(), data);
     } catch (err: unknown) {
       if (err instanceof Error && err.message === "UNAUTHORIZED") {
         setError("UNAUTHORIZED");
@@ -62,8 +69,11 @@ export function YouTubeConnectionProvider({
         setError("NOT_CONNECTED");
       }
       setConnectionState({ connected: false });
+      queryClient.setQueryData(queryKeys.youtube.connection(), { connected: false });
+    } finally {
+      setIsLoading(false);
     }
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -117,6 +127,8 @@ export function YouTubeConnectionProvider({
               if (isMounted) {
                 setSyncVersion((v) => v + 1);
                 void fetchConnection();
+                // Invalidate all queries across the application to trigger automatic re-fetch
+                void queryClient.invalidateQueries({ queryKey: queryKeys.all });
               }
             } catch (syncErr) {
               console.warn("Background auto-sync failed:", syncErr);
@@ -137,7 +149,7 @@ export function YouTubeConnectionProvider({
     return () => {
       isMounted = false;
     };
-  }, [isConnected, isDemoMode, isAutoSyncing, channel?.id, connectionState?.channel?.id, fetchConnection]);
+  }, [isConnected, isDemoMode, isAutoSyncing, channel?.id, connectionState?.channel?.id, fetchConnection, queryClient]);
 
   return (
     <YouTubeConnectionContext.Provider

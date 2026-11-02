@@ -1,38 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui";
-import { getCreatorOverview, type CreatorOverviewResponse } from "@/lib/creator";
+import { useCreatorOverviewQuery } from "@/lib/queries";
 import { formatCount, startYouTubeOAuth } from "@/lib/youtube";
 import { useYouTubeConnection } from "@/lib/youtube-connection-context";
 
 export function KpiMetricCards() {
-  const { isConnected, syncVersion, isAutoSyncing } = useYouTubeConnection();
-  const [overview, setOverview] = useState<CreatorOverviewResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-    async function fetchOverview() {
-      if (!isConnected) return;
-      setIsLoading(true);
-      try {
-        const data = await getCreatorOverview();
-        if (isMounted && data && data.medians) {
-          setOverview(data);
-        }
-      } catch (err) {
-        console.warn("Failed to fetch creator overview:", err);
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    }
-    fetchOverview();
-    return () => {
-      isMounted = false;
-    };
-  }, [isConnected, syncVersion]);
+  const { isConnected, isAutoSyncing } = useYouTubeConnection();
+  const { data: overview, isLoading } = useCreatorOverviewQuery({
+    enabled: isConnected,
+  });
 
   const hasVideos = Boolean(overview?.totals?.totalVideos && overview.totals.totalVideos > 0);
 

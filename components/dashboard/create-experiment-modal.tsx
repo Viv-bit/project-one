@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { DetailedInsight } from "@/lib/types/creator-intelligence";
-import { createExperiment, type ExperimentCategory } from "@/lib/experiments";
-import { getRecommendations, type ApiRecommendation } from "@/lib/insights";
+import { type ExperimentCategory } from "@/lib/experiments";
+import {
+  useRecommendationsQuery,
+  useCreateExperimentMutation,
+} from "@/lib/queries";
 
 type CreateExperimentModalProps = {
   isOpen: boolean;
@@ -26,7 +29,12 @@ export function CreateExperimentModal({
   preselectedInsight,
   onExperimentCreated,
 }: CreateExperimentModalProps) {
-  const [recommendations, setRecommendations] = useState<ApiRecommendation[]>([]);
+  const { data: recData } = useRecommendationsQuery({
+    enabled: isOpen,
+  });
+  const recommendations = recData?.recommendations ?? [];
+  const createMutation = useCreateExperimentMutation();
+
   const [title, setTitle] = useState(
     preselectedInsight
       ? `Test: ${preselectedInsight.suggestedExperiment?.hypothesis?.slice(0, 50) ?? preselectedInsight.title}...`
@@ -56,25 +64,6 @@ export function CreateExperimentModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    let isMounted = true;
-    async function load() {
-      try {
-        const data = await getRecommendations();
-        if (isMounted && data && Array.isArray(data.recommendations)) {
-          setRecommendations(data.recommendations);
-        }
-      } catch (err) {
-        console.warn("Failed to load recommendations for modal:", err);
-      }
-    }
-    load();
-    return () => {
-      isMounted = false;
-    };
-  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -108,7 +97,7 @@ export function CreateExperimentModal({
     setErrorMsg(null);
 
     try {
-      const created = await createExperiment({
+      const created = await createMutation.mutateAsync({
         title,
         hypothesis,
         category,

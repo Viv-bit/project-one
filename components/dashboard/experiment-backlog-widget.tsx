@@ -1,53 +1,31 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui";
 import {
-  getExperiments,
-  createExperiment,
-  type ApiExperiment,
-} from "@/lib/experiments";
+  useExperimentsQuery,
+  useCreateExperimentMutation,
+} from "@/lib/queries";
 import { startYouTubeOAuth } from "@/lib/youtube";
 import { useYouTubeConnection } from "@/lib/youtube-connection-context";
 
 export function ExperimentBacklogWidget() {
   const { isConnected } = useYouTubeConnection();
-  const [experiments, setExperiments] = useState<ApiExperiment[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const { data: experiments = [], isLoading } = useExperimentsQuery();
+  const createExperimentMutation = useCreateExperimentMutation();
+  const isSubmitting = createExperimentMutation.isPending;
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newPredictedLift, setNewPredictedLift] = useState("+15% Watch Time");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-    async function load() {
-      setIsLoading(true);
-      try {
-        const data = await getExperiments();
-        if (isMounted && Array.isArray(data)) {
-          setExperiments(data);
-        }
-      } catch (err) {
-        console.warn("Failed to fetch experiments for widget:", err);
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    }
-    load();
-    return () => {
-      isMounted = false;
-    };
-  }, [isConnected]);
 
   async function handleCreateHypothesis(e: React.FormEvent) {
     e.preventDefault();
     if (!newTitle.trim()) return;
 
     try {
-      setIsSubmitting(true);
-      const created = await createExperiment({
+      await createExperimentMutation.mutateAsync({
         title: newTitle.trim(),
         hypothesis: `Testing: ${newTitle.trim()} with predicted target lift ${newPredictedLift}.`,
         category: "HOOK",
@@ -56,15 +34,10 @@ export function ExperimentBacklogWidget() {
         durationDays: 14,
       });
 
-      if (created) {
-        setExperiments((prev) => [created, ...prev]);
-      }
       setNewTitle("");
       setIsModalOpen(false);
     } catch (err) {
       console.error("Failed to create experiment:", err);
-    } finally {
-      setIsSubmitting(false);
     }
   }
 

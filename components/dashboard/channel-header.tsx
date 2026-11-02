@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Icon } from "@/components/ui";
-import { getCreatorProfile, type CreatorProfileResponse } from "@/lib/creator";
+import { useCreatorProfileQuery } from "@/lib/queries";
 import { formatCount, startYouTubeOAuth } from "@/lib/youtube";
 import { useYouTubeConnection } from "@/lib/youtube-connection-context";
 
 export function ChannelHeader() {
-  const { isConnected, channel, syncVersion } = useYouTubeConnection();
-  const [profileData, setProfileData] = useState<CreatorProfileResponse | null>(null);
+  const { isConnected, channel } = useYouTubeConnection();
+  const { data: profileData } = useCreatorProfileQuery({
+    enabled: isConnected,
+  });
   const [baselineOption, setBaselineOption] = useState("Past 16 Posts Baseline");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [exportFeedback, setExportFeedback] = useState<string | null>(null);
@@ -19,21 +21,6 @@ export function ChannelHeader() {
     "Top 10 Long-form Only",
     "Shorts & Verticals Only",
   ];
-
-  useEffect(() => {
-    async function fetchProfile() {
-      if (!isConnected) return;
-      try {
-        const data = await getCreatorProfile();
-        if (data && data.channel) {
-          setProfileData(data);
-        }
-      } catch {
-        // Retain context channel data if API fetch fails
-      }
-    }
-    fetchProfile();
-  }, [isConnected, syncVersion]);
 
   // When NOT connected, show dedicated empty state
   if (!isConnected) {

@@ -1,38 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui";
-import { getCreatorBenchmark, type BenchmarkComparisonResult } from "@/lib/benchmarks";
+import { useCreatorBenchmarkQuery } from "@/lib/queries";
 import { startYouTubeOAuth } from "@/lib/youtube";
 import { useYouTubeConnection } from "@/lib/youtube-connection-context";
 
 export function CohortBenchmarkingWidget() {
   const { isConnected } = useYouTubeConnection();
-  const [benchmarkData, setBenchmarkData] = useState<BenchmarkComparisonResult | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-    async function fetchBenchmark() {
-      if (!isConnected) return;
-      setIsLoading(true);
-      try {
-        const data = await getCreatorBenchmark();
-        if (isMounted && data) {
-          setBenchmarkData(data);
-        }
-      } catch (err) {
-        console.warn("Failed to fetch cohort benchmark:", err);
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    }
-    fetchBenchmark();
-    return () => {
-      isMounted = false;
-    };
-  }, [isConnected]);
+  const { data: benchmarkData, isLoading } = useCreatorBenchmarkQuery({
+    enabled: isConnected,
+  });
 
   // Empty state when YouTube is not connected OR when no upload history exists
   if (!isConnected || !benchmarkData || !benchmarkData.hasData) {

@@ -1,72 +1,38 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui/icon";
 import {
-  getCreatorBenchmark,
-  getBenchmarkGroups,
-  selectBenchmarkGroup,
-  type BenchmarkComparisonResult,
-  type BenchmarkGroup,
-} from "@/lib/benchmarks";
+  useCreatorBenchmarkQuery,
+  useBenchmarkGroupsQuery,
+  useSelectBenchmarkGroupMutation,
+} from "@/lib/queries";
 import { formatCount, startYouTubeOAuth } from "@/lib/youtube";
 import { useYouTubeConnection } from "@/lib/youtube-connection-context";
 
 export function BenchmarksView() {
   const { isConnected } = useYouTubeConnection();
-  const [benchmarkData, setBenchmarkData] = useState<BenchmarkComparisonResult | null>(null);
-  const [availableGroups, setAvailableGroups] = useState<BenchmarkGroup[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isChangingCohort, setIsChangingCohort] = useState(false);
+  const { data: benchmarkData, isLoading: isBenchmarkLoading } = useCreatorBenchmarkQuery({
+    enabled: isConnected,
+  });
+  const { data: groupsData, isLoading: isGroupsLoading } = useBenchmarkGroupsQuery();
+  const selectGroupMutation = useSelectBenchmarkGroupMutation();
+
+  const availableGroups = groupsData?.groups ?? [];
+  const isLoading = isBenchmarkLoading || isGroupsLoading;
+  const isChangingCohort = selectGroupMutation.isPending;
   const [feedback, setFeedback] = useState<string | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function load() {
-      setIsLoading(true);
-      try {
-        const [benchmarkRes, groupsRes] = await Promise.allSettled([
-          getCreatorBenchmark(),
-          getBenchmarkGroups(),
-        ]);
-
-        if (!isMounted) return;
-
-        if (benchmarkRes.status === "fulfilled" && benchmarkRes.value) {
-          setBenchmarkData(benchmarkRes.value);
-        }
-        if (groupsRes.status === "fulfilled" && groupsRes.value?.groups) {
-          setAvailableGroups(groupsRes.value.groups);
-        }
-      } catch (err) {
-        console.warn("Failed to load benchmark data:", err);
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    }
-
-    load();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isConnected]);
 
   async function handleSwitchCohort(groupId: string) {
     try {
-      setIsChangingCohort(true);
-      await selectBenchmarkGroup(groupId);
+      await selectGroupMutation.mutateAsync(groupId);
       setFeedback("Cohort updated successfully!");
-      const updated = await getCreatorBenchmark();
-      setBenchmarkData(updated);
       setTimeout(() => setFeedback(null), 3000);
-    } catch (err: any) {
-      setFeedback(err?.message ?? "Failed to update cohort");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to update cohort";
+      setFeedback(msg);
       setTimeout(() => setFeedback(null), 4000);
-    } finally {
-      setIsChangingCohort(false);
     }
   }
 

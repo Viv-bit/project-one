@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui";
-import { getYouTubeVideos, formatCount, startYouTubeOAuth, type YouTubeVideoItem } from "@/lib/youtube";
+import { formatCount, startYouTubeOAuth } from "@/lib/youtube";
+import { useYouTubeVideosQuery } from "@/lib/queries";
 import { useYouTubeConnection } from "@/lib/youtube-connection-context";
 
 function formatDuration(seconds?: number | null): string {
@@ -14,31 +14,10 @@ function formatDuration(seconds?: number | null): string {
 }
 
 export function ContentSplitCard() {
-  const { isConnected, syncVersion, isAutoSyncing } = useYouTubeConnection();
-  const [videos, setVideos] = useState<YouTubeVideoItem[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-    async function load() {
-      if (!isConnected) return;
-      setIsLoading(true);
-      try {
-        const data = await getYouTubeVideos();
-        if (isMounted && Array.isArray(data)) {
-          setVideos(data);
-        }
-      } catch (err) {
-        console.warn("Failed to fetch videos for content split:", err);
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    }
-    load();
-    return () => {
-      isMounted = false;
-    };
-  }, [isConnected, syncVersion]);
+  const { isConnected, isAutoSyncing } = useYouTubeConnection();
+  const { data: videos = [], isLoading } = useYouTubeVideosQuery(undefined, {
+    enabled: isConnected,
+  });
 
   // Empty state when YouTube is not connected OR fewer than 2 videos are synced
   if (!isConnected || videos.length < 2) {

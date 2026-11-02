@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import type { RetentionFormat } from "@/lib/types/creator-intelligence";
 import { RETENTION_CURVE_DATA } from "@/lib/data/intelligence-mock-data";
 import { Icon } from "@/components/ui";
-import { startYouTubeOAuth, getYouTubeVideos } from "@/lib/youtube";
+import { startYouTubeOAuth } from "@/lib/youtube";
+import { useYouTubeVideosQuery } from "@/lib/queries";
 import { useYouTubeConnection } from "@/lib/youtube-connection-context";
 
 const X_AXIS_TICKS = [
@@ -17,28 +18,13 @@ const X_AXIS_TICKS = [
 ] as const;
 
 export function RetentionCurveChart() {
-  const { isConnected, syncVersion, isAutoSyncing } = useYouTubeConnection();
-  const [hasVideos, setHasVideos] = useState<boolean | null>(null);
+  const { isConnected, isAutoSyncing } = useYouTubeConnection();
+  const { data: videos = [] } = useYouTubeVideosQuery(undefined, {
+    enabled: isConnected,
+  });
+  const hasVideos = isConnected && Array.isArray(videos) && videos.length > 0;
   const [selectedFormat, setSelectedFormat] = useState<RetentionFormat>("all");
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!isConnected) {
-      setHasVideos(false);
-      return;
-    }
-    let isMounted = true;
-    getYouTubeVideos()
-      .then((videos) => {
-        if (isMounted) setHasVideos(Array.isArray(videos) && videos.length > 0);
-      })
-      .catch(() => {
-        if (isMounted) setHasVideos(false);
-      });
-    return () => {
-      isMounted = false;
-    };
-  }, [isConnected, syncVersion]);
 
   // SVG dimensions & coordinate calculations
   const width = 640;
