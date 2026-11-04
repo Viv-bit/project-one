@@ -7,10 +7,11 @@ import { startYouTubeOAuth } from "@/lib/youtube";
 import { useYouTubeConnection } from "@/lib/youtube-connection-context";
 
 export function CohortBenchmarkingWidget() {
-  const { isConnected } = useYouTubeConnection();
+  const { isConnected, isAutoSyncing, triggerAutoSync } = useYouTubeConnection();
   const { data: benchmarkData, isLoading } = useCreatorBenchmarkQuery({
     enabled: isConnected,
   });
+  const isPreparing = isConnected && (isAutoSyncing || isLoading);
 
   // Empty state when YouTube is not connected OR when no upload history exists
   if (!isConnected || !benchmarkData || !benchmarkData.hasData) {
@@ -25,14 +26,16 @@ export function CohortBenchmarkingWidget() {
             <h2 className="text-base font-semibold text-ink">Cohort Benchmarking</h2>
           </div>
           <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-            {!isConnected ? "Connection Required" : "Awaiting Videos"}
+            {!isConnected ? "Connection Required" : isPreparing ? "Auto-Calibrating..." : "Awaiting Videos"}
           </span>
         </div>
 
         <p className="mt-2.5 text-xs text-[#786f65] leading-relaxed">
           {!isConnected
             ? "Peer comparisons against verified creator cohorts unlock once your YouTube channel is connected."
-            : "Calibrating against peer cohorts requires ingested video uploads to calculate comparative metrics."}
+            : isPreparing
+              ? "Automatically syncing your channel uploads and calibrating peer cohort percentiles."
+              : "Calibrating against peer cohorts requires at least one public video upload on your channel."}
         </p>
 
         {/* Locked Cohort Preview Rows */}
@@ -71,14 +74,20 @@ export function CohortBenchmarkingWidget() {
             <Icon name="youtube" className="size-3.5 text-red-600" />
             <span>Connect Channel to Unlock Cohorts</span>
           </button>
+        ) : isPreparing ? (
+          <div className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-brand/20 bg-brand/5 py-2 text-xs font-semibold text-brand">
+            <Icon name="refresh" className="size-3.5 animate-spin text-brand" />
+            <span>Calibrating Cohort Automatically...</span>
+          </div>
         ) : (
-          <Link
-            href="/dashboard/youtube"
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-brand/30 bg-brand/5 py-2 text-xs font-semibold text-brand hover:bg-brand/10 transition-colors"
+          <button
+            type="button"
+            onClick={() => void triggerAutoSync({ force: true })}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-brand/30 bg-brand/5 py-2 text-xs font-semibold text-brand hover:bg-brand/10 transition-colors cursor-pointer"
           >
             <Icon name="refresh-cw" className="size-3.5 text-brand" />
-            <span>Sync Videos in Integrations</span>
-          </Link>
+            <span>Re-check Cohort Calibration</span>
+          </button>
         )}
       </div>
     );

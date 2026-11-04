@@ -6,12 +6,40 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useRef,
   type ReactNode,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "./query-keys";
 import { type YouTubeConnectionState, type YouTubeChannel } from "./api";
-import { getYouTubeConnection, startYouTubeOAuth } from "./youtube";
+import {
+  getYouTubeConnection,
+  getYouTubeVideos,
+  syncYouTubeVideos,
+  analyzeYouTubeVideos,
+  startYouTubeOAuth,
+} from "./youtube";
+import {
+  getCreatorProfile,
+  getCreatorOverview,
+  getCreatorContent,
+} from "./creator";
+import { getRecommendations } from "./insights";
+import { getCreatorBenchmark } from "./benchmarks";
+import {
+  useCurrentUserQuery,
+  useYouTubeConnectionQuery,
+  invalidateAllCreatorData,
+} from "./queries";
+import {
+  useAnalyticsStore,
+  selectLoggedInAnalytics,
+  type AutoSyncStage,
+} from "./store/analytics-store";
+
+export type { AutoSyncStage };
+
+const AUTO_SYNC_STALE_MS = 15 * 60 * 1000; // Refresh channel telemetry automatically every 15 minutes
 
 type YouTubeConnectionContextValue = {
   connectionState: YouTubeConnectionState | null;
@@ -24,9 +52,11 @@ type YouTubeConnectionContextValue = {
   // Demo mode toggle for previewing empty vs populated states
   isDemoMode: boolean;
   toggleDemoMode: () => void;
-  // Automatic sync status
+  // Automatic sync & analysis state
   isAutoSyncing: boolean;
+  autoSyncStage: AutoSyncStage;
   syncVersion: number;
+  triggerAutoSync: (options?: { force?: boolean }) => Promise<void>;
 };
 
 const YouTubeConnectionContext = createContext<
@@ -40,56 +70,59 @@ export function YouTubeConnectionProvider({
 }) {
   const queryClient = useQueryClient();
 
-  // Default to unconnected empty state so new users and initial render immediately display empty state
-  const [connectionState, setConnectionState] =
-    useState<YouTubeConnectionState | null>({ connected: false });
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isAutoSyncing, setIsAutoSyncing] = useState(false);
-  const [syncVersion, setSyncVersion] = useState(0);
+  const hasHydrated = useAnalyticsStore((s) => s.hasHydrated);
+  const currentUserId = useAnalyticsStore((s) => s.currentUser?.id ?? null);
+  const autoSyncStage = useAnalyticsStore((s) => s.autoSyncStage);
+  const syncVersion = useAnalyticsStore((s) => s.syncVersion);
+  const cachedConnection = useAnalyticsStore(
+    (s) => selectLoggedInAnalytics(s)?.connection ?? null,
+  );
+
+  // Resolve authenticated user & YouTube connection via TanStack Query + Zustand cache
+  useCurrentUserQuery();
+  const {
+    data: queryConnectionState,
+    isLoading: isQueryLoading,
+    error: queryError,
+    refetch: refetchConnectionQuery,
+  } = useYouTubeConnectionQuery();
+
   const [isDemoMode, setIsDemoMode] = useState(() => {
     if (typeof window !== "undefined") {
-      return new URLSearchParams(window.location.search).get("demo") === "connected";
+      return (
+        new URLSearchParams(window.location.search).get("demo") === "connected"
+      );
     }
     return false;
   });
 
-  const fetchConnection = useCallback(async () => {
-    setError(null);
-    setIsLoading(true);
-    try {
-      const data = await getYouTubeConnection();
-      setConnectionState(data);
-      // Keep TanStack query cache synchronized
-      queryClient.setQueryData(queryKeys.youtube.connection(), data);
-    } catch (err: unknown) {
-      if (err instanceof Error && err.message === "UNAUTHORIZED") {
-        setError("UNAUTHORIZED");
-      } else {
-        setError("NOT_CONNECTED");
-      }
-      setConnectionState({ connected: false });
-      queryClient.setQueryData(queryKeys.youtube.connection(), { connected: false });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [queryClient]);
+  const syncInFlightRef = useRef(false);
+  const checkedKeysRef = useRef<Set<string>>(new Set());
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void fetchConnection();
-  }, [fetchConnection]);
+  const connectionState: YouTubeConnectionState =
+    queryConnectionState ?? cachedConnection ?? { connected: false };
 
-  const toggleDemoMode = () => {
-    setIsDemoMode((prev) => !prev);
-  };
+  const isLoading = !cachedConnection && isQueryLoading;
+  const error =
+    queryError instanceof Error
+      ? queryError.message === "UNAUTHORIZED"
+        ? "UNAUTHORIZED"
+        : "NOT_CONNECTED"
+      : null;
 
-  const isConnected = isDemoMode
-    ? true
-    : Boolean(connectionState && connectionState.connected);
+  const refreshConnection = useCallback(async () => {
+    await refetchConnectionQuery();
+  }, [refetchConnectionQuery]);
 
-  const channel = isConnected
-    ? connectionState && connectionState.connected
+  const realConnected = Boolean(connectionState.connected);
+  const realChannelId = connectionState.connected
+    ? connectionState.channel.id
+    : null;
+
+  const isConnected = isDemoMode ? true : realConnected;
+
+  const channel: YouTubeChannel | null = isConnected
+    ? connectionState.connected
       ? connectionState.channel
       : isDemoMode
         ? {
@@ -103,53 +136,238 @@ export function YouTubeConnectionProvider({
         : null
     : null;
 
-  // Auto-sync trigger when channel is connected but has 0 videos synced
-  useEffect(() => {
-    if (!isConnected || isDemoMode || isAutoSyncing) return;
+  /**
+   * Automatically syncs the user's YouTube videos, computes overview medians,
+   * runs Gemini AI feature classification when needed, and persists basic analytics to localStorage.
+   */
+  const runAutoSyncPipeline = useCallback(
+    async (options?: { force?: boolean }) => {
+      if (syncInFlightRef.current) return;
+      if (isDemoMode || !realConnected || !realChannelId) return;
 
-    let isMounted = true;
-    async function checkAndAutoSync() {
+      syncInFlightRef.current = true;
+      const storeActions = useAnalyticsStore.getState();
+
       try {
-        const { getYouTubeVideos, syncYouTubeVideos } = await import("./youtube");
-        const videos = await getYouTubeVideos();
-        if (!isMounted) return;
+        const cachedBefore = selectLoggedInAnalytics(
+          useAnalyticsStore.getState(),
+        );
+        const lastSyncedAt = cachedBefore?.lastSyncedAt ?? null;
+        const isSyncStale =
+          !lastSyncedAt || Date.now() - lastSyncedAt > AUTO_SYNC_STALE_MS;
 
-        if (Array.isArray(videos) && videos.length === 0) {
-          const channelId = channel?.id || connectionState?.channel?.id || "default";
-          const storageKey = `yt_autosync_attempted_${channelId}`;
+        // If we have no cached medians yet, indicate checking right away so UI doesn't flash empty state
+        if (!cachedBefore?.overview?.totals?.totalVideos) {
+          storeActions.setAutoSyncStage("checking");
+        }
 
-          if (typeof window !== "undefined" && !sessionStorage.getItem(storageKey)) {
-            sessionStorage.setItem(storageKey, "true");
-            setIsAutoSyncing(true);
+        const [existingVideos, existingOverview] = await Promise.all([
+          getYouTubeVideos().catch(() => []),
+          getCreatorOverview().catch(() => null),
+        ]);
 
-            try {
-              await syncYouTubeVideos({ count: 20, classify: true });
-              if (isMounted) {
-                setSyncVersion((v) => v + 1);
-                void fetchConnection();
-                // Invalidate all queries across the application to trigger automatic re-fetch
-                void queryClient.invalidateQueries({ queryKey: queryKeys.all });
-              }
-            } catch (syncErr) {
-              console.warn("Background auto-sync failed:", syncErr);
-            } finally {
-              if (isMounted) {
-                setIsAutoSyncing(false);
-              }
+        let latestVideos = Array.isArray(existingVideos) ? existingVideos : [];
+        if (latestVideos.length > 0) {
+          useAnalyticsStore.getState().saveVideos(latestVideos);
+          queryClient.setQueryData(queryKeys.youtube.videos(), latestVideos);
+        }
+        if (existingOverview) {
+          useAnalyticsStore.getState().saveOverview(existingOverview);
+          queryClient.setQueryData(
+            queryKeys.creator.overview(),
+            existingOverview,
+          );
+        }
+
+        const missingMedians =
+          !existingOverview?.totals?.totalVideos ||
+          existingOverview.totals.totalVideos === 0 ||
+          existingOverview.medians?.views == null;
+
+        const needsSync =
+          Boolean(options?.force) ||
+          latestVideos.length === 0 ||
+          missingMedians ||
+          isSyncStale;
+
+        let didMutate = false;
+
+        if (needsSync) {
+          useAnalyticsStore.getState().setAutoSyncStage("syncing");
+
+          try {
+            const syncRes = await syncYouTubeVideos({
+              count: 20,
+              classify: true,
+            });
+            didMutate = true;
+            const st = useAnalyticsStore.getState();
+            st.markSynced();
+            if (syncRes.classifiedCount && syncRes.classifiedCount > 0) {
+              st.markAnalyzed();
             }
+
+            if (Array.isArray(syncRes.posts) && syncRes.posts.length > 0) {
+              latestVideos = syncRes.posts;
+            } else {
+              latestVideos = await getYouTubeVideos().catch(() => latestVideos);
+            }
+
+            if (latestVideos.length > 0) {
+              useAnalyticsStore.getState().saveVideos(latestVideos);
+              queryClient.setQueryData(
+                queryKeys.youtube.videos(),
+                latestVideos,
+              );
+            }
+          } catch (syncErr) {
+            console.warn("Automatic YouTube video sync failed:", syncErr);
+          }
+        }
+
+        // Automatically run Gemini AI classification if any ingested videos lack hook/topic features
+        const hasUnanalyzedVideos =
+          latestVideos.length > 0 &&
+          latestVideos.some(
+            (v) => !v.features?.topic && !v.features?.hookType,
+          );
+
+        if (hasUnanalyzedVideos) {
+          useAnalyticsStore.getState().setAutoSyncStage("analyzing");
+
+          try {
+            await analyzeYouTubeVideos({ force: false });
+            didMutate = true;
+            useAnalyticsStore.getState().markAnalyzed();
+          } catch (analyzeErr) {
+            console.warn("Automatic Gemini video analysis failed:", analyzeErr);
+          }
+        }
+
+        // Refresh and persist all core analytics snapshots to Zustand localStorage + TanStack Query
+        const needsCacheWarmup =
+          didMutate ||
+          !cachedBefore?.profile ||
+          !cachedBefore?.overview ||
+          !cachedBefore?.recommendations ||
+          !cachedBefore?.benchmark;
+
+        if (needsCacheWarmup) {
+          const [
+            connRes,
+            profileRes,
+            overviewRes,
+            videosRes,
+            contentRes,
+            recsRes,
+            benchRes,
+          ] = await Promise.allSettled([
+            getYouTubeConnection(),
+            getCreatorProfile(),
+            getCreatorOverview(),
+            getYouTubeVideos(),
+            getCreatorContent(),
+            getRecommendations(),
+            getCreatorBenchmark(),
+          ]);
+
+          const store = useAnalyticsStore.getState();
+
+          if (connRes.status === "fulfilled") {
+            store.saveConnection(connRes.value);
+            queryClient.setQueryData(
+              queryKeys.youtube.connection(),
+              connRes.value,
+            );
+          }
+          if (profileRes.status === "fulfilled") {
+            store.saveProfile(profileRes.value);
+            queryClient.setQueryData(
+              queryKeys.creator.profile(),
+              profileRes.value,
+            );
+          }
+          if (overviewRes.status === "fulfilled") {
+            store.saveOverview(overviewRes.value);
+            queryClient.setQueryData(
+              queryKeys.creator.overview(),
+              overviewRes.value,
+            );
+          }
+          if (videosRes.status === "fulfilled") {
+            store.saveVideos(videosRes.value);
+            queryClient.setQueryData(
+              queryKeys.youtube.videos(),
+              videosRes.value,
+            );
+          }
+          if (contentRes.status === "fulfilled") {
+            store.saveContent(contentRes.value);
+            queryClient.setQueryData(
+              queryKeys.creator.content(),
+              contentRes.value,
+            );
+          }
+          if (recsRes.status === "fulfilled") {
+            store.saveRecommendations(recsRes.value);
+            queryClient.setQueryData(
+              queryKeys.insights.recommendations(),
+              recsRes.value,
+            );
+          }
+          if (benchRes.status === "fulfilled") {
+            store.saveBenchmark(benchRes.value);
+            queryClient.setQueryData(
+              queryKeys.benchmarks.creator(),
+              benchRes.value,
+            );
+          }
+
+          if (didMutate) {
+            await invalidateAllCreatorData(queryClient);
+            useAnalyticsStore.getState().incrementSyncVersion();
           }
         }
       } catch (err) {
-        console.warn("Auto-sync check encountered an error:", err);
+        console.warn("Automatic sync & analysis pipeline error:", err);
+      } finally {
+        syncInFlightRef.current = false;
+        useAnalyticsStore.getState().setAutoSyncStage("idle");
       }
+    },
+    [isDemoMode, realConnected, realChannelId, queryClient],
+  );
+
+  // Automatically trigger sync + analysis once Zustand store has hydrated and a real channel is connected
+  useEffect(() => {
+    if (!hasHydrated || isDemoMode || !realConnected || !realChannelId) {
+      return;
     }
 
-    void checkAndAutoSync();
+    const sessionCheckKey = `${currentUserId ?? "anon"}:${realChannelId}`;
+    if (checkedKeysRef.current.has(sessionCheckKey)) {
+      return;
+    }
 
-    return () => {
-      isMounted = false;
-    };
-  }, [isConnected, isDemoMode, isAutoSyncing, channel?.id, connectionState?.channel?.id, fetchConnection, queryClient]);
+    checkedKeysRef.current.add(sessionCheckKey);
+    void runAutoSyncPipeline();
+  }, [
+    hasHydrated,
+    isDemoMode,
+    realConnected,
+    realChannelId,
+    currentUserId,
+    runAutoSyncPipeline,
+  ]);
+
+  const toggleDemoMode = () => {
+    setIsDemoMode((prev) => !prev);
+  };
+
+  const isAutoSyncing =
+    autoSyncStage === "checking" ||
+    autoSyncStage === "syncing" ||
+    autoSyncStage === "analyzing";
 
   return (
     <YouTubeConnectionContext.Provider
@@ -159,12 +377,14 @@ export function YouTubeConnectionProvider({
         isConnected,
         channel,
         error,
-        refreshConnection: fetchConnection,
+        refreshConnection,
         connectYouTube: startYouTubeOAuth,
         isDemoMode,
         toggleDemoMode,
         isAutoSyncing,
+        autoSyncStage,
         syncVersion,
+        triggerAutoSync: runAutoSyncPipeline,
       }}
     >
       {children}

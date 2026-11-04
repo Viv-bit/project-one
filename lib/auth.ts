@@ -11,6 +11,7 @@ import {
   type AuthValidationErrorResponse,
   type AuthUser,
 } from "./api";
+import { useAnalyticsStore } from "./store/analytics-store";
 
 export { authLogoutUrl, authMeUrl, logoutUser, handleAuthError, apiFetch };
 export type { AuthUser };
@@ -70,7 +71,11 @@ export async function signupUser(
     throw new AuthApiError(message, res.status, errorBody?.errors);
   }
 
-  return (await res.json()) as AuthSuccessResponse;
+  const data = (await res.json()) as AuthSuccessResponse;
+  if (data?.user) {
+    useAnalyticsStore.getState().setAuthenticatedUser(data.user);
+  }
+  return data;
 }
 
 /**
@@ -102,7 +107,11 @@ export async function signinUser(
     throw new AuthApiError(message, res.status, errorBody?.errors);
   }
 
-  return (await res.json()) as AuthSuccessResponse;
+  const data = (await res.json()) as AuthSuccessResponse;
+  if (data?.user) {
+    useAnalyticsStore.getState().setAuthenticatedUser(data.user);
+  }
+  return data;
 }
 
 /**
@@ -127,13 +136,23 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     });
 
     if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        useAnalyticsStore.getState().clearSession();
+      }
       return null;
     }
 
     const data = await res.json();
-    if (data?.user) return data.user as AuthUser;
-    if (data?.email) return data as AuthUser;
-    return null;
+    const resolvedUser: AuthUser | null = data?.user
+      ? (data.user as AuthUser)
+      : data?.email
+        ? (data as AuthUser)
+        : null;
+
+    if (resolvedUser) {
+      useAnalyticsStore.getState().setAuthenticatedUser(resolvedUser);
+    }
+    return resolvedUser;
   } catch {
     return null;
   }

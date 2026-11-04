@@ -14,10 +14,11 @@ function formatDuration(seconds?: number | null): string {
 }
 
 export function ContentSplitCard() {
-  const { isConnected, isAutoSyncing } = useYouTubeConnection();
+  const { isConnected, isAutoSyncing, triggerAutoSync } = useYouTubeConnection();
   const { data: videos = [], isLoading } = useYouTubeVideosQuery(undefined, {
     enabled: isConnected,
   });
+  const isPreparing = isConnected && (isAutoSyncing || isLoading);
 
   // Empty state when YouTube is not connected OR fewer than 2 videos are synced
   if (!isConnected || videos.length < 2) {
@@ -31,7 +32,7 @@ export function ContentSplitCard() {
                 Top vs Underperforming Content Split
               </h2>
               <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-                {isAutoSyncing ? "Syncing Videos..." : !isConnected ? "Awaiting Connection" : "Need 2+ Ingested Videos"}
+                {isPreparing ? "Auto-Syncing Videos..." : !isConnected ? "Awaiting Connection" : "Need 2+ Public Uploads"}
               </span>
             </div>
             <p className="text-xs text-[#82786e]">
@@ -123,7 +124,11 @@ export function ContentSplitCard() {
         {/* Bottom CTA */}
         <div className="mt-4 flex items-center justify-between pt-3 border-t border-[#f2ede4]">
           <span className="text-xs text-[#80766c]">
-            {!isConnected ? "OAuth authentication required" : "Sync at least 2 videos in Integrations"}
+            {!isConnected
+              ? "OAuth authentication required"
+              : isPreparing
+                ? "Importing & comparing uploads automatically..."
+                : "Requires at least 2 public uploads on your channel"}
           </span>
           {!isConnected ? (
             <button
@@ -133,14 +138,20 @@ export function ContentSplitCard() {
               <Icon name="youtube" className="size-3.5" />
               <span>Connect Channel</span>
             </button>
+          ) : isPreparing ? (
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand shrink-0">
+              <Icon name="refresh" className="size-3.5 animate-spin" />
+              <span>Auto-syncing</span>
+            </span>
           ) : (
-            <Link
-              href="/dashboard/youtube"
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-strong shrink-0"
+            <button
+              type="button"
+              onClick={() => void triggerAutoSync({ force: true })}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-strong shrink-0 cursor-pointer"
             >
               <Icon name="refresh-cw" className="size-3.5" />
-              <span>Sync Videos</span>
-            </Link>
+              <span>Re-check Uploads</span>
+            </button>
           )}
         </div>
       </div>

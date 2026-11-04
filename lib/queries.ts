@@ -2,6 +2,7 @@ import {
   useQuery,
   useMutation,
   useQueryClient,
+  type QueryClient,
   type UseQueryOptions,
 } from "@tanstack/react-query";
 import { queryKeys } from "./query-keys";
@@ -50,6 +51,102 @@ import {
   type BenchmarkComparisonResult,
   type BenchmarkGroupsResponse,
 } from "./benchmarks";
+import {
+  useAnalyticsStore,
+  selectLoggedInAnalytics,
+} from "./store/analytics-store";
+
+// ==========================================
+// Cache Synchronization Helpers
+// ==========================================
+
+/**
+ * Invalidate all creator/channel query domains so medians, insights,
+ * videos, benchmarks, and experiments refetch automatically.
+ */
+export async function invalidateAllCreatorData(
+  queryClient: QueryClient,
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: queryKeys.youtube.all }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.creator.all }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.insights.all }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.benchmarks.all }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.experiments.all }),
+  ]);
+}
+
+/**
+ * Seed TanStack Query cache from Zustand localStorage analytics when a user is logged in.
+ * Only populates keys that do not yet have fresh in-memory data.
+ */
+export function hydrateQueryClientFromStore(queryClient: QueryClient): void {
+  const state = useAnalyticsStore.getState();
+  if (!state.hasHydrated || !state.currentUser) {
+    return;
+  }
+
+  if (queryClient.getQueryData(queryKeys.auth.user()) === undefined) {
+    queryClient.setQueryData(queryKeys.auth.user(), state.currentUser);
+  }
+
+  const cached = selectLoggedInAnalytics(state);
+  if (!cached) {
+    return;
+  }
+
+  if (
+    cached.connection &&
+    queryClient.getQueryData(queryKeys.youtube.connection()) === undefined
+  ) {
+    queryClient.setQueryData(queryKeys.youtube.connection(), cached.connection);
+  }
+
+  if (
+    cached.profile &&
+    queryClient.getQueryData(queryKeys.creator.profile()) === undefined
+  ) {
+    queryClient.setQueryData(queryKeys.creator.profile(), cached.profile);
+  }
+
+  if (
+    cached.overview &&
+    queryClient.getQueryData(queryKeys.creator.overview()) === undefined
+  ) {
+    queryClient.setQueryData(queryKeys.creator.overview(), cached.overview);
+  }
+
+  if (
+    cached.content &&
+    queryClient.getQueryData(queryKeys.creator.content()) === undefined
+  ) {
+    queryClient.setQueryData(queryKeys.creator.content(), cached.content);
+  }
+
+  if (
+    cached.videos.length > 0 &&
+    queryClient.getQueryData(queryKeys.youtube.videos()) === undefined
+  ) {
+    queryClient.setQueryData(queryKeys.youtube.videos(), cached.videos);
+  }
+
+  if (
+    cached.recommendations &&
+    queryClient.getQueryData(queryKeys.insights.recommendations()) === undefined
+  ) {
+    queryClient.setQueryData(
+      queryKeys.insights.recommendations(),
+      cached.recommendations,
+    );
+  }
+
+  if (
+    cached.benchmark &&
+    queryClient.getQueryData(queryKeys.benchmarks.creator()) === undefined
+  ) {
+    queryClient.setQueryData(queryKeys.benchmarks.creator(), cached.benchmark);
+  }
+}
 
 // ==========================================
 // Query Hooks
@@ -58,6 +155,10 @@ import {
 export function useCurrentUserQuery(
   options?: Omit<UseQueryOptions<AuthUser | null>, "queryKey" | "queryFn">,
 ) {
+  const cachedUser = useAnalyticsStore((s) =>
+    s.hasHydrated ? s.currentUser : null,
+  );
+
   return useQuery({
     queryKey: queryKeys.auth.user(),
     queryFn: async (): Promise<AuthUser | null> => {
@@ -70,22 +171,34 @@ export function useCurrentUserQuery(
         throw err;
       }
     },
+    placeholderData: cachedUser ?? undefined,
     ...options,
   });
 }
 
 export function useYouTubeConnectionQuery(
-  options?: Omit<UseQueryOptions<YouTubeConnectionState>, "queryKey" | "queryFn">,
+  options?: Omit<
+    UseQueryOptions<YouTubeConnectionState>,
+    "queryKey" | "queryFn"
+  >,
 ) {
+  const cachedConnection = useAnalyticsStore(
+    (s) => selectLoggedInAnalytics(s)?.connection ?? undefined,
+  );
+
   return useQuery({
     queryKey: queryKeys.youtube.connection(),
     queryFn: async (): Promise<YouTubeConnectionState> => {
       try {
-        return await getYouTubeConnection();
+        const conn = await getYouTubeConnection();
+        useAnalyticsStore.getState().saveConnection(conn);
+        return conn;
       } catch {
-        return { connected: false };
+        const fallback: YouTubeConnectionState = { connected: false };
+        return fallback;
       }
     },
+    placeholderData: cachedConnection,
     ...options,
   });
 }
@@ -94,39 +207,86 @@ export function useYouTubeVideosQuery(
   limit?: number,
   options?: Omit<UseQueryOptions<YouTubeVideoItem[]>, "queryKey" | "queryFn">,
 ) {
+  const cachedVideos = useAnalyticsStore((s) => {
+    const videos = selectLoggedInAnalytics(s)?.videos;
+    if (!videos || videos.length === 0) return undefined;
+    return limit ? videos.slice(0, limit) : videos;
+  });
+
   return useQuery({
     queryKey: queryKeys.youtube.videos(limit),
-    queryFn: () => getYouTubeVideos(),
+    queryFn: async () => {
+      const videos = await getYouTubeVideos();
+      useAnalyticsStore.getState().saveVideos(videos);
+      return limit ? videos.slice(0, limit) : videos;
+    },
+    placeholderData: cachedVideos,
     ...options,
   });
 }
 
 export function useCreatorProfileQuery(
-  options?: Omit<UseQueryOptions<CreatorProfileResponse>, "queryKey" | "queryFn">,
+  options?: Omit<
+    UseQueryOptions<CreatorProfileResponse>,
+    "queryKey" | "queryFn"
+  >,
 ) {
+  const cachedProfile = useAnalyticsStore(
+    (s) => selectLoggedInAnalytics(s)?.profile ?? undefined,
+  );
+
   return useQuery({
     queryKey: queryKeys.creator.profile(),
-    queryFn: getCreatorProfile,
+    queryFn: async () => {
+      const profile = await getCreatorProfile();
+      useAnalyticsStore.getState().saveProfile(profile);
+      return profile;
+    },
+    placeholderData: cachedProfile,
     ...options,
   });
 }
 
 export function useCreatorOverviewQuery(
-  options?: Omit<UseQueryOptions<CreatorOverviewResponse>, "queryKey" | "queryFn">,
+  options?: Omit<
+    UseQueryOptions<CreatorOverviewResponse>,
+    "queryKey" | "queryFn"
+  >,
 ) {
+  const cachedOverview = useAnalyticsStore(
+    (s) => selectLoggedInAnalytics(s)?.overview ?? undefined,
+  );
+
   return useQuery({
     queryKey: queryKeys.creator.overview(),
-    queryFn: getCreatorOverview,
+    queryFn: async () => {
+      const overview = await getCreatorOverview();
+      useAnalyticsStore.getState().saveOverview(overview);
+      return overview;
+    },
+    placeholderData: cachedOverview,
     ...options,
   });
 }
 
 export function useCreatorContentQuery(
-  options?: Omit<UseQueryOptions<CreatorContentResponse>, "queryKey" | "queryFn">,
+  options?: Omit<
+    UseQueryOptions<CreatorContentResponse>,
+    "queryKey" | "queryFn"
+  >,
 ) {
+  const cachedContent = useAnalyticsStore(
+    (s) => selectLoggedInAnalytics(s)?.content ?? undefined,
+  );
+
   return useQuery({
     queryKey: queryKeys.creator.content(),
-    queryFn: getCreatorContent,
+    queryFn: async () => {
+      const content = await getCreatorContent();
+      useAnalyticsStore.getState().saveContent(content);
+      return content;
+    },
+    placeholderData: cachedContent,
     ...options,
   });
 }
@@ -143,11 +303,23 @@ export function useInsightsQuery(
 }
 
 export function useRecommendationsQuery(
-  options?: Omit<UseQueryOptions<RecommendationsResponse>, "queryKey" | "queryFn">,
+  options?: Omit<
+    UseQueryOptions<RecommendationsResponse>,
+    "queryKey" | "queryFn"
+  >,
 ) {
+  const cachedRecs = useAnalyticsStore(
+    (s) => selectLoggedInAnalytics(s)?.recommendations ?? undefined,
+  );
+
   return useQuery({
     queryKey: queryKeys.insights.recommendations(),
-    queryFn: getRecommendations,
+    queryFn: async () => {
+      const recs = await getRecommendations();
+      useAnalyticsStore.getState().saveRecommendations(recs);
+      return recs;
+    },
+    placeholderData: cachedRecs,
     ...options,
   });
 }
@@ -176,17 +348,32 @@ export function useExperimentDetailQuery(
 }
 
 export function useCreatorBenchmarkQuery(
-  options?: Omit<UseQueryOptions<BenchmarkComparisonResult>, "queryKey" | "queryFn">,
+  options?: Omit<
+    UseQueryOptions<BenchmarkComparisonResult>,
+    "queryKey" | "queryFn"
+  >,
 ) {
+  const cachedBenchmark = useAnalyticsStore(
+    (s) => selectLoggedInAnalytics(s)?.benchmark ?? undefined,
+  );
+
   return useQuery({
     queryKey: queryKeys.benchmarks.creator(),
-    queryFn: getCreatorBenchmark,
+    queryFn: async () => {
+      const benchmark = await getCreatorBenchmark();
+      useAnalyticsStore.getState().saveBenchmark(benchmark);
+      return benchmark;
+    },
+    placeholderData: cachedBenchmark,
     ...options,
   });
 }
 
 export function useBenchmarkGroupsQuery(
-  options?: Omit<UseQueryOptions<BenchmarkGroupsResponse>, "queryKey" | "queryFn">,
+  options?: Omit<
+    UseQueryOptions<BenchmarkGroupsResponse>,
+    "queryKey" | "queryFn"
+  >,
 ) {
   return useQuery({
     queryKey: queryKeys.benchmarks.groups(),
@@ -205,15 +392,16 @@ export function useSyncYouTubeMutation() {
   return useMutation({
     mutationFn: (options?: SyncYouTubeOptions): Promise<SyncYouTubeResult> =>
       syncYouTubeVideos(options),
-    onSuccess: async () => {
-      // Invalidate all dependent data when YouTube videos are synced
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.youtube.all }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.creator.all }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.insights.all }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.benchmarks.all }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.experiments.all }),
-      ]);
+    onSuccess: async (res) => {
+      const store = useAnalyticsStore.getState();
+      store.markSynced();
+      if (Array.isArray(res.posts) && res.posts.length > 0) {
+        store.saveVideos(res.posts);
+      }
+      if (res.classifiedCount && res.classifiedCount > 0) {
+        store.markAnalyzed();
+      }
+      await invalidateAllCreatorData(queryClient);
     },
   });
 }
@@ -224,13 +412,8 @@ export function useDisconnectYouTubeMutation() {
   return useMutation({
     mutationFn: disconnectYouTubeConnection,
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.youtube.all }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.creator.all }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.insights.all }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.benchmarks.all }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.experiments.all }),
-      ]);
+      useAnalyticsStore.getState().clearActiveChannelAnalytics();
+      await invalidateAllCreatorData(queryClient);
     },
   });
 }
@@ -242,11 +425,8 @@ export function useAnalyzeYouTubeMutation() {
     mutationFn: (options?: AnalyzeYouTubeOptions) =>
       analyzeYouTubeVideos(options),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.creator.all }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.insights.all }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.benchmarks.all }),
-      ]);
+      useAnalyticsStore.getState().markAnalyzed();
+      await invalidateAllCreatorData(queryClient);
     },
   });
 }
@@ -255,8 +435,7 @@ export function useCreateExperimentMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: CreateExperimentPayload) =>
-      createExperiment(payload),
+    mutationFn: (payload: CreateExperimentPayload) => createExperiment(payload),
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.experiments.all }),

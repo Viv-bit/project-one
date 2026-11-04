@@ -13,8 +13,14 @@ import { DashboardConnectBanner } from "@/components/dashboard/dashboard-connect
 import { Icon } from "@/components/ui";
 
 export function DashboardView() {
-  const { isLoading, isConnected, isDemoMode, toggleDemoMode, isAutoSyncing } =
-    useYouTubeConnection();
+  const {
+    isLoading,
+    isConnected,
+    isDemoMode,
+    toggleDemoMode,
+    isAutoSyncing,
+    autoSyncStage,
+  } = useYouTubeConnection();
 
   if (isLoading) {
     return (
@@ -68,16 +74,18 @@ export function DashboardView() {
             </div>
             <div>
               <p className="text-xs font-semibold text-brand">
-                Syncing channel data in background...
+                {autoSyncStage === "analyzing"
+                  ? "Running Gemini AI hook & topic analysis..."
+                  : "Syncing channel uploads & calculating medians..."}
               </p>
               <p className="text-[11px] text-[#73695d]">
-                Importing your latest uploads and computing AI features. This page will update automatically.
+                Importing your latest uploads, computing baseline medians, and classifying AI features automatically.
               </p>
             </div>
           </div>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-2.5 py-0.5 text-[10px] font-semibold text-brand">
             <span className="size-1.5 rounded-full bg-brand animate-pulse" />
-            Auto-syncing
+            {autoSyncStage === "analyzing" ? "AI Analyzing" : "Auto-syncing"}
           </span>
         </div>
       )}

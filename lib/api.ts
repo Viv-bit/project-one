@@ -1,3 +1,5 @@
+import { useAnalyticsStore } from "@/lib/store/analytics-store";
+
 export const apiUrl =
   process.env.NEXT_PUBLIC_API_URL ?? "https://project-one-be-eb1t.onrender.com";
 
@@ -70,6 +72,8 @@ export async function handleAuthError(): Promise<void> {
     return;
   }
 
+  useAnalyticsStore.getState().clearSession();
+
   if (!logoutPromise) {
     logoutPromise = (async () => {
       try {
@@ -99,6 +103,8 @@ export async function handleAuthError(): Promise<void> {
  * Explicit logout helper that calls POST /api/auth/logout and redirects to /sign-in.
  */
 export async function logoutUser(redirectToSignIn = true): Promise<void> {
+  useAnalyticsStore.getState().clearSession();
+
   try {
     await fetch(authLogoutUrl, {
       method: "POST",

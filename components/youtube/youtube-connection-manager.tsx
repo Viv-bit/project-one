@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { type YouTubeConnectionState } from "@/lib/api";
-import { getYouTubeConnection } from "@/lib/youtube";
+import { useState } from "react";
+import { useYouTubeConnection } from "@/lib/youtube-connection-context";
+import { useAnalyticsStore } from "@/lib/store/analytics-store";
 import { YouTubeConnectCard } from "./youtube-connect-card";
 import { YouTubeConnectedCard } from "./youtube-connected-card";
 import { YouTubeLoadingCard } from "./youtube-loading-card";
@@ -16,80 +16,35 @@ type YouTubeConnectionManagerProps = {
 export function YouTubeConnectionManager({
   initialError,
 }: YouTubeConnectionManagerProps) {
-  const [connectionState, setConnectionState] =
-    useState<YouTubeConnectionState | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(() => {
-    if (initialError === "youtube") {
-      return "YouTube account connection was not completed. Google consent was cancelled or an error occurred during authorization.";
-    }
-    if (initialError) {
-      return `Connection notice: ${initialError}. Please try connecting again.`;
-    }
-    return null;
-  });
+  const {
+    connectionState,
+    isLoading,
+    error: connectionError,
+    refreshConnection,
+    triggerAutoSync,
+  } = useYouTubeConnection();
+
+  const [dismissedUrlError, setDismissedUrlError] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const loadConnection = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const data = await getYouTubeConnection();
-      setConnectionState(data);
-    } catch (err: unknown) {
-      console.error("Failed to fetch YouTube connection status:", err);
-      // If unauthorized, could be that session expired
-      if (err instanceof Error && err.message === "UNAUTHORIZED") {
-        setErrorMessage(
-          "Your creator session could not be verified. Please ensure you are logged in.",
-        );
-      }
-      // Set default not connected state so the user can still see the connect button
-      setConnectionState({ connected: false });
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    let ignore = false;
-
-    async function initialFetch() {
-      try {
-        const data = await getYouTubeConnection();
-        if (!ignore) {
-          setConnectionState(data);
-        }
-      } catch (err: unknown) {
-        if (!ignore) {
-          console.error("Failed to fetch YouTube connection status:", err);
-          if (err instanceof Error && err.message === "UNAUTHORIZED") {
-            setErrorMessage(
-              "Your creator session could not be verified. Please ensure you are logged in.",
-            );
-          }
-          setConnectionState({ connected: false });
-        }
-      } finally {
-        if (!ignore) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    void initialFetch();
-
-    return () => {
-      ignore = true;
-    };
-  }, []);
+  const errorMessage = !dismissedUrlError
+    ? initialError === "youtube"
+      ? "YouTube account connection was not completed. Google consent was cancelled or an error occurred during authorization."
+      : initialError
+        ? `Connection notice: ${initialError}. Please try connecting again.`
+        : connectionError === "UNAUTHORIZED"
+          ? "Your creator session could not be verified. Please ensure you are logged in."
+          : null
+    : null;
 
   const handleDisconnected = () => {
-    setConnectionState({ connected: false });
+    useAnalyticsStore.getState().clearActiveChannelAnalytics();
+    void refreshConnection();
     showToast("YouTube account disconnected successfully.");
   };
 
   const handleDismissError = () => {
-    setErrorMessage(null);
+    setDismissedUrlError(true);
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
       if (url.searchParams.has("error")) {
@@ -136,8 +91,9 @@ export function YouTubeConnectionManager({
         <YouTubeConnectedCard
           channel={connectionState.channel}
           onRefresh={async () => {
-            await loadConnection();
-            showToast("Channel metrics updated from YouTube API.");
+            await refreshConnection();
+            await triggerAutoSync({ force: true });
+            showToast("Channel metrics, medians, and AI analysis updated.");
           }}
           onDisconnected={handleDisconnected}
         />

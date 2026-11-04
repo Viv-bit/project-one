@@ -10,7 +10,7 @@ import { useYouTubeConnection } from "@/lib/youtube-connection-context";
 import { CreateExperimentModal } from "@/components/dashboard/create-experiment-modal";
 
 export function EvidenceOpportunitiesCard() {
-  const { isConnected, isAutoSyncing } = useYouTubeConnection();
+  const { isConnected, isAutoSyncing, triggerAutoSync } = useYouTubeConnection();
   const [activeModalItem, setActiveModalItem] = useState<ApiRecommendation | null>(null);
   const [isExperimentModalOpen, setIsExperimentModalOpen] = useState(false);
 
@@ -18,6 +18,7 @@ export function EvidenceOpportunitiesCard() {
     enabled: isConnected,
   });
   const recommendations = data?.recommendations ?? [];
+  const isPreparing = isConnected && (isAutoSyncing || isLoading);
 
   // Empty state when YouTube is not connected OR when no opportunities generated yet
   if (!isConnected || recommendations.length === 0) {
@@ -34,23 +35,30 @@ export function EvidenceOpportunitiesCard() {
             </h2>
           </div>
           <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-            {isAutoSyncing ? "Analyzing Channel..." : !isConnected ? "Awaiting Ingestion" : "Sync & Analyze"}
+            {isPreparing ? "Analyzing Channel..." : !isConnected ? "Awaiting Ingestion" : "Calibrating"}
           </span>
         </div>
 
         {/* Empty state body */}
         <div className="mt-5 rounded-xl bg-[#faf8f4] border border-[#ede6dc] p-5 text-center">
           <div className="mx-auto grid size-11 place-items-center rounded-2xl bg-white border border-[#e4dacf] text-brand shadow-sm">
-            <Icon name="spark" className="size-5" />
+            <Icon
+              name={isPreparing ? "refresh" : "spark"}
+              className={`size-5 ${isPreparing ? "animate-spin" : ""}`}
+            />
           </div>
 
           <h3 className="mt-3 font-serif text-base sm:text-lg font-medium text-ink">
-            No Opportunities Generated Yet
+            {isPreparing
+              ? "Generating AI Opportunities Automatically..."
+              : "No Opportunities Generated Yet"}
           </h3>
           <p className="mt-1.5 max-w-md mx-auto text-xs text-[#70665b] leading-relaxed">
             {!isConnected
               ? "Link your YouTube channel to allow Gemini AI and our regression engine to scan your video library, identify audience churn bottlenecks, and prescribe evidence-backed fixes."
-              : "Sync your channel uploads and run AI analysis to detect audience churn patterns and generate high-confidence prescriptive opportunities."}
+              : isPreparing
+                ? "Automatically syncing your uploads and running Gemini AI diagnostics to surface high-confidence prescriptive opportunities."
+                : "Upload more public videos on your channel to unlock statistical opportunity detection."}
           </p>
 
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
@@ -62,15 +70,16 @@ export function EvidenceOpportunitiesCard() {
                 <Icon name="youtube" className="size-4" />
                 <span>Connect YouTube Account</span>
               </button>
-            ) : (
-              <Link
-                href="/dashboard/youtube"
-                className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-strong"
+            ) : !isPreparing ? (
+              <button
+                type="button"
+                onClick={() => void triggerAutoSync({ force: true })}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-strong cursor-pointer"
               >
                 <Icon name="refresh-cw" className="size-3.5" />
-                <span>Sync &amp; Analyze Videos</span>
-              </Link>
-            )}
+                <span>Re-run Analysis</span>
+              </button>
+            ) : null}
             <Link
               href="/dashboard/insights"
               className="rounded-xl border border-[#ded4c6] bg-white px-3.5 py-2 text-xs font-semibold text-[#665e54] hover:bg-[#faf7f2]"

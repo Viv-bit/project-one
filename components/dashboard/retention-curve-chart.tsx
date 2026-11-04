@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import type { RetentionFormat } from "@/lib/types/creator-intelligence";
 import { RETENTION_CURVE_DATA } from "@/lib/data/intelligence-mock-data";
 import { Icon } from "@/components/ui";
@@ -18,10 +17,11 @@ const X_AXIS_TICKS = [
 ] as const;
 
 export function RetentionCurveChart() {
-  const { isConnected, isAutoSyncing } = useYouTubeConnection();
-  const { data: videos = [] } = useYouTubeVideosQuery(undefined, {
+  const { isConnected, isAutoSyncing, triggerAutoSync } = useYouTubeConnection();
+  const { data: videos = [], isLoading } = useYouTubeVideosQuery(undefined, {
     enabled: isConnected,
   });
+  const isPreparing = isConnected && (isAutoSyncing || isLoading);
   const hasVideos = isConnected && Array.isArray(videos) && videos.length > 0;
   const [selectedFormat, setSelectedFormat] = useState<RetentionFormat>("all");
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
@@ -92,7 +92,7 @@ export function RetentionCurveChart() {
                 Retention &amp; Hook Velocity Curve
               </h2>
               <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-                {isAutoSyncing ? "Syncing Uploads..." : !isConnected ? "Awaiting Connection" : "Sync Required"}
+                {isPreparing ? "Auto-Syncing Uploads..." : !isConnected ? "Awaiting Connection" : "No Uploads Found"}
               </span>
             </div>
             <p className="text-xs text-[#82786e]">
@@ -153,16 +153,25 @@ export function RetentionCurveChart() {
           {/* Centered Empty State Card */}
           <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
             <div className="grid size-12 place-items-center rounded-2xl bg-white border border-[#e2d7c9] text-brand shadow-sm">
-              <Icon name="activity" className="size-6" />
+              <Icon
+                name={isPreparing ? "refresh" : "activity"}
+                className={`size-6 ${isPreparing ? "animate-spin" : ""}`}
+              />
             </div>
 
             <h3 className="mt-3 font-serif text-lg sm:text-xl font-medium text-ink">
-              {!isConnected ? "Retention Diagnostics Unavailable" : "Upload Ingestion Required"}
+              {!isConnected
+                ? "Retention Diagnostics Unavailable"
+                : isPreparing
+                  ? "Calibrating Retention Curve Automatically..."
+                  : "No Public Uploads Detected"}
             </h3>
             <p className="mt-1.5 max-w-md text-xs sm:text-[13px] text-[#70665b] leading-relaxed">
               {!isConnected
                 ? "Connect your YouTube channel to analyze your first 3-second hook drop-off rates, benchmark against cohort curves, and identify where viewers churn."
-                : "Ingest and analyze your channel videos in Integrations to calibrate retention drop-off rates against peer benchmarks."}
+                : isPreparing
+                  ? "Automatically importing your channel videos and computing AI hook retention telemetry. Your curves will appear momentarily."
+                  : "No public YouTube uploads were found on your connected channel yet."}
             </p>
 
             {!isConnected ? (
@@ -173,15 +182,16 @@ export function RetentionCurveChart() {
                 <Icon name="youtube" className="size-4" />
                 <span>Connect YouTube Channel</span>
               </button>
-            ) : (
-              <Link
-                href="/dashboard/youtube"
-                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-brand-strong"
+            ) : !isPreparing ? (
+              <button
+                type="button"
+                onClick={() => void triggerAutoSync({ force: true })}
+                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-brand-strong cursor-pointer"
               >
                 <Icon name="refresh-cw" className="size-3.5" />
-                <span>Sync Videos in Integrations</span>
-              </Link>
-            )}
+                <span>Re-check Channel Uploads</span>
+              </button>
+            ) : null}
           </div>
         </div>
 

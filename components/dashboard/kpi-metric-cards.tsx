@@ -1,18 +1,19 @@
 "use client";
 
-import Link from "next/link";
 import { Icon } from "@/components/ui";
 import { useCreatorOverviewQuery } from "@/lib/queries";
 import { formatCount, startYouTubeOAuth } from "@/lib/youtube";
 import { useYouTubeConnection } from "@/lib/youtube-connection-context";
 
 export function KpiMetricCards() {
-  const { isConnected, isAutoSyncing } = useYouTubeConnection();
+  const { isConnected, isAutoSyncing, autoSyncStage, triggerAutoSync } =
+    useYouTubeConnection();
   const { data: overview, isLoading } = useCreatorOverviewQuery({
     enabled: isConnected,
   });
 
   const hasVideos = Boolean(overview?.totals?.totalVideos && overview.totals.totalVideos > 0);
+  const isPreparingMetrics = isConnected && (isAutoSyncing || isLoading);
 
   // Empty state for users without a connected channel OR without ingested videos
   if (!isConnected || !hasVideos) {
@@ -34,28 +35,30 @@ export function KpiMetricCards() {
               —
             </span>
             <span className="inline-flex items-center gap-1 rounded-full bg-[#f4ede3] text-[#7d7367] px-2 py-0.5 text-[11px] font-medium">
-              {isAutoSyncing ? (
+              {isPreparingMetrics ? (
                 <>
                   <Icon name="refresh" className="size-2.5 animate-spin text-brand" />
-                  <span>Syncing...</span>
+                  <span>
+                    {autoSyncStage === "analyzing" ? "Analyzing..." : "Syncing..."}
+                  </span>
                 </>
               ) : !isConnected ? (
                 "Awaiting Channel"
               ) : (
-                "Sync Required"
+                "No Uploads Found"
               )}
             </span>
           </div>
 
           <div className="mt-3 pt-2.5 border-t border-[#f2ede4] flex items-center justify-between text-xs text-[#9c9185]">
             <span>
-              {isAutoSyncing
-                ? "Importing latest uploads..."
+              {isPreparingMetrics
+                ? "Calculating medians & AI analysis..."
                 : !isConnected
                   ? "Requires YouTube link"
-                  : "0 videos synced"}
+                  : "0 public videos detected"}
             </span>
-            {isAutoSyncing ? (
+            {isPreparingMetrics ? (
               <span className="font-medium text-brand inline-flex items-center gap-1 text-[11px]">
                 <Icon name="refresh" className="size-3 animate-spin" /> Auto-syncing
               </span>
@@ -67,9 +70,13 @@ export function KpiMetricCards() {
                 Connect
               </button>
             ) : (
-              <Link href="/dashboard/youtube" className="font-medium text-brand hover:underline">
-                Sync now
-              </Link>
+              <button
+                type="button"
+                onClick={() => void triggerAutoSync({ force: true })}
+                className="font-medium text-brand hover:underline cursor-pointer"
+              >
+                Re-check
+              </button>
             )}
           </div>
         </div>

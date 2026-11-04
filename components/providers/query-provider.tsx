@@ -1,11 +1,14 @@
 "use client";
 
-import React, { useState, type ReactNode } from "react";
+import React, { useState, useEffect, type ReactNode } from "react";
 import {
   QueryClient,
   QueryClientProvider,
   isServer,
 } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
+import { hydrateQueryClientFromStore } from "@/lib/queries";
+import { useAnalyticsStore } from "@/lib/store/analytics-store";
 
 function makeQueryClient() {
   return new QueryClient({
@@ -47,6 +50,43 @@ export function getQueryClient() {
 export function QueryProvider({ children }: { children: ReactNode }) {
   // QueryClient instance created once per component lifecycle
   const [queryClient] = useState(() => getQueryClient());
+
+  useEffect(() => {
+    void Promise.resolve(useAnalyticsStore.persist.rehydrate()).then(() => {
+      hydrateQueryClientFromStore(queryClient);
+    });
+
+    let previousUserId = useAnalyticsStore.getState().currentUser?.id ?? null;
+
+    const unsubscribe = useAnalyticsStore.subscribe((state) => {
+      const nextUserId = state.currentUser?.id ?? null;
+      if (nextUserId === previousUserId) {
+        return;
+      }
+
+      if (!nextUserId) {
+        // User logged out: clear in-memory query cache while preserving localStorage snapshot for future logins
+        queryClient.removeQueries({ queryKey: queryKeys.auth.all });
+        queryClient.removeQueries({ queryKey: queryKeys.youtube.all });
+        queryClient.removeQueries({ queryKey: queryKeys.creator.all });
+        queryClient.removeQueries({ queryKey: queryKeys.insights.all });
+        queryClient.removeQueries({ queryKey: queryKeys.benchmarks.all });
+        queryClient.removeQueries({ queryKey: queryKeys.experiments.all });
+      } else {
+        // User logged in (or switched accounts): clear previous user's in-memory queries & pull saved localStorage analytics
+        if (previousUserId && previousUserId !== nextUserId) {
+          queryClient.clear();
+        }
+        hydrateQueryClientFromStore(queryClient);
+      }
+
+      previousUserId = nextUserId;
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>

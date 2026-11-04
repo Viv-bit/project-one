@@ -1,19 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
+import { formatCount } from "@/lib/youtube";
 import {
-  syncYouTubeVideos,
-  analyzeYouTubeVideos,
-  getYouTubeVideos,
-  formatCount,
-  type YouTubeVideoItem,
-} from "@/lib/youtube";
+  useYouTubeVideosQuery,
+  useSyncYouTubeMutation,
+  useAnalyzeYouTubeMutation,
+} from "@/lib/queries";
+import { useYouTubeConnection } from "@/lib/youtube-connection-context";
+
 export function YouTubeVideoIngestPanel() {
-  const [videos, setVideos] = useState<YouTubeVideoItem[]>([]);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const { isConnected, isAutoSyncing, autoSyncStage } = useYouTubeConnection();
+  const { data: videos = [], isLoading: isVideosLoading } = useYouTubeVideosQuery(
+    undefined,
+    { enabled: isConnected },
+  );
+  const syncMutation = useSyncYouTubeMutation();
+  const analyzeMutation = useAnalyzeYouTubeMutation();
+
   const [syncCount, setSyncCount] = useState<number>(20);
   const [autoClassify, setAutoClassify] = useState<boolean>(true);
   const [forceReclassify, setForceReclassify] = useState<boolean>(false);
@@ -22,42 +28,17 @@ export function YouTubeVideoIngestPanel() {
     message: string;
   } | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
-    async function load() {
-      try {
-        const data = await getYouTubeVideos();
-        if (isMounted) {
-          setVideos(data || []);
-        }
-      } catch {
-        if (isMounted) setVideos([]);
-      }
-    }
-    load();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  async function refreshVideos() {
-    try {
-      const data = await getYouTubeVideos();
-      setVideos(data || []);
-    } catch {
-      // Keep existing
-    }
-  }
+  const isSyncing = syncMutation.isPending || autoSyncStage === "syncing";
+  const isAnalyzing = analyzeMutation.isPending || autoSyncStage === "analyzing";
 
   async function handleSync() {
     try {
-      setIsSyncing(true);
       setNotification({
         type: "info",
         message: `Syncing last ${syncCount} YouTube videos${autoClassify ? " with Gemini AI analysis" : ""}...`,
       });
 
-      const res = await syncYouTubeVideos({
+      const res = await syncMutation.mutateAsync({
         count: syncCount,
         classify: autoClassify,
       });
@@ -66,28 +47,26 @@ export function YouTubeVideoIngestPanel() {
         type: "success",
         message: `Successfully synced ${res.syncedCount ?? syncCount} videos${res.classifiedCount ? ` and classified ${res.classifiedCount} with Gemini AI` : ""}!`,
       });
-
-      await refreshVideos();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Sync failed";
       setNotification({
         type: "error",
-        message: msg === "UNAUTHORIZED" ? "Please sign in to sync YouTube videos." : msg,
+        message:
+          msg === "UNAUTHORIZED"
+            ? "Please sign in to sync YouTube videos."
+            : msg,
       });
-    } finally {
-      setIsSyncing(false);
     }
   }
 
   async function handleAnalyze(postIds?: string[]) {
     try {
-      setIsAnalyzing(true);
       setNotification({
         type: "info",
         message: "Running Gemini 2.5 Flash classification pipeline...",
       });
 
-      const res = await analyzeYouTubeVideos({
+      const res = await analyzeMutation.mutateAsync({
         force: forceReclassify,
         ...(postIds && { postIds }),
       });
@@ -96,20 +75,21 @@ export function YouTubeVideoIngestPanel() {
         type: "success",
         message: `Gemini classified ${res.analyzedCount ?? (postIds ? postIds.length : videos.length)} videos! Features updated.`,
       });
-
-      await refreshVideos();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Analysis failed";
       setNotification({
         type: "error",
-        message: msg === "UNAUTHORIZED" ? "Please sign in to analyze videos." : msg,
+        message:
+          msg === "UNAUTHORIZED"
+            ? "Please sign in to analyze videos."
+            : msg,
       });
-    } finally {
-      setIsAnalyzing(false);
     }
   }
 
-  const classifiedCount = videos.filter((v) => v.features?.topic || v.features?.hookType).length;
+  const classifiedCount = videos.filter(
+    (v) => v.features?.topic || v.features?.hookType,
+  ).length;
 
   return (
     <div className="rounded-2xl border border-line bg-white p-6 sm:p-8 shadow-sm space-y-6">
@@ -125,7 +105,7 @@ export function YouTubeVideoIngestPanel() {
             </span>
           </div>
           <p className="mt-1 text-xs text-muted">
-            Import recent uploads via YouTube Data API and categorize hooks, topics, pillars, and tones using Gemini AI.
+            Uploads sync and classify automatically when connected. Use the controls on the right anytime you want an on-demand refresh.
           </p>
         </div>
 
@@ -156,12 +136,12 @@ export function YouTubeVideoIngestPanel() {
             <span className="text-[11px] font-medium text-ink">Auto-Classify</span>
           </label>
 
-          {/* Sync Button */}
+          {/* Manual Refresh Sync Button */}
           <Button
             variant="primary"
             size="sm"
             onClick={handleSync}
-            disabled={isSyncing}
+            disabled={isSyncing || !isConnected}
             leadingIcon={
               <Icon
                 name="refresh"
@@ -170,7 +150,7 @@ export function YouTubeVideoIngestPanel() {
             }
             className="text-xs font-semibold h-9"
           >
-            {isSyncing ? "Syncing..." : "Sync Videos"}
+            {isSyncing ? "Syncing..." : "Refresh Sync"}
           </Button>
 
           {/* Analyze with Gemini Button */}
@@ -187,10 +167,22 @@ export function YouTubeVideoIngestPanel() {
             }
             className="text-xs font-semibold h-9"
           >
-            {isAnalyzing ? "Analyzing..." : "Analyze with Gemini"}
+            {isAnalyzing ? "Analyzing..." : "Re-Analyze with Gemini"}
           </Button>
         </div>
       </div>
+
+      {/* Auto-sync active info banner */}
+      {isAutoSyncing && !notification && (
+        <div className="flex items-center gap-2 rounded-xl bg-brand/10 text-brand-strong border border-brand/20 px-4 py-3 text-xs animate-in fade-in">
+          <Icon name="refresh" className="size-4 shrink-0 animate-spin text-brand" />
+          <span>
+            {autoSyncStage === "analyzing"
+              ? "Automatically classifying video hooks, topics, and pillars with Gemini AI..."
+              : "Automatically syncing your recent YouTube uploads and computing baseline medians..."}
+          </span>
+        </div>
+      )}
 
       {/* Notification Banner */}
       {notification && (
@@ -246,10 +238,10 @@ export function YouTubeVideoIngestPanel() {
       </div>
 
       {/* Videos List / Table */}
-      {isSyncing ? (
+      {(isSyncing || isVideosLoading) && videos.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-muted text-xs space-y-2">
           <Icon name="refresh" className="size-6 animate-spin text-brand" />
-          <span>Syncing and processing YouTube uploads...</span>
+          <span>Automatically syncing and processing YouTube uploads...</span>
         </div>
       ) : videos.length === 0 ? (
         <div className="text-center py-12 rounded-xl border border-dashed border-line bg-cream/30 p-8 space-y-3">
@@ -257,14 +249,18 @@ export function YouTubeVideoIngestPanel() {
             <Icon name="video" className="size-6" />
           </div>
           <h3 className="font-serif text-lg font-normal text-ink">
-            No Videos Ingested Yet
+            {isConnected ? "No Public Uploads Detected" : "Connect Channel to Sync Videos"}
           </h3>
           <p className="text-xs text-muted max-w-md mx-auto">
-            Click &quot;Sync Videos&quot; above to pull your most recent 10 to 20 uploads from YouTube and classify their hooks and topics.
+            {isConnected
+              ? "Your connected YouTube channel currently has no ingested public uploads. Publish a video or click Refresh Sync to check again."
+              : "Connect your YouTube channel above and Lumen will automatically import and analyze your recent uploads."}
           </p>
-          <Button variant="primary" size="sm" onClick={handleSync}>
-            Sync Recent Videos
-          </Button>
+          {isConnected && (
+            <Button variant="primary" size="sm" onClick={handleSync}>
+              Refresh Sync
+            </Button>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
@@ -278,7 +274,7 @@ export function YouTubeVideoIngestPanel() {
               const viewsCount =
                 video.views ?? video.metrics?.[0]?.views ?? 0;
               const hasFeatures = Boolean(
-                video.features?.topic || video.features?.hookType
+                video.features?.topic || video.features?.hookType,
               );
 
               return (
@@ -343,11 +339,12 @@ export function YouTubeVideoIngestPanel() {
                     ) : (
                       <div className="flex items-center gap-2">
                         <span className="rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 text-[10px] font-medium">
-                          Pending AI Analysis
+                          {isAnalyzing ? "Analyzing..." : "Pending AI Analysis"}
                         </span>
                         <Button
                           variant="ghost"
                           size="sm"
+                          disabled={isAnalyzing}
                           onClick={() => handleAnalyze([video.id])}
                           className="text-[11px] h-7 px-2 text-brand hover:text-brand-strong"
                         >
