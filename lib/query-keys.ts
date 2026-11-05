@@ -33,6 +33,8 @@ export const queryKeys = {
   benchmarks: {
     all: ["benchmarks"] as const,
     creator: () => [...queryKeys.benchmarks.all, "creator"] as const,
+    goals: () => [...queryKeys.benchmarks.all, "goals"] as const,
+    growthPlan: () => [...queryKeys.benchmarks.all, "growth-plan"] as const,
     cohorts: () => [...queryKeys.benchmarks.all, "cohorts"] as const,
     groups: () => [...queryKeys.benchmarks.all, "groups"] as const,
   },

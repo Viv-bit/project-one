@@ -46,10 +46,18 @@ import {
 } from "./experiments";
 import {
   getCreatorBenchmark,
+  getBenchmarkGoals,
+  updateBenchmarkGoal,
+  discoverBenchmarkPeers,
+  getBenchmarkGrowthPlan,
   getBenchmarkGroups,
   selectBenchmarkGroup,
+  type BenchmarkGoalId,
+  type BenchmarkGoalsResponse,
   type BenchmarkComparisonResult,
+  type BenchmarkGrowthPlanResponse,
   type BenchmarkGroupsResponse,
+  type UpdateBenchmarkGoalPayload,
 } from "./benchmarks";
 import {
   useAnalyticsStore,
@@ -369,6 +377,32 @@ export function useCreatorBenchmarkQuery(
   });
 }
 
+export function useBenchmarkGoalsQuery(
+  options?: Omit<
+    UseQueryOptions<BenchmarkGoalsResponse>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery({
+    queryKey: queryKeys.benchmarks.goals(),
+    queryFn: getBenchmarkGoals,
+    ...options,
+  });
+}
+
+export function useBenchmarkGrowthPlanQuery(
+  options?: Omit<
+    UseQueryOptions<BenchmarkGrowthPlanResponse>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery({
+    queryKey: queryKeys.benchmarks.growthPlan(),
+    queryFn: getBenchmarkGrowthPlan,
+    ...options,
+  });
+}
+
 export function useBenchmarkGroupsQuery(
   options?: Omit<
     UseQueryOptions<BenchmarkGroupsResponse>,
@@ -508,6 +542,61 @@ export function useSelectBenchmarkGroupMutation() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.benchmarks.all }),
         queryClient.invalidateQueries({ queryKey: queryKeys.creator.all }),
+      ]);
+    },
+  });
+}
+
+export function useSelectBenchmarkGoalMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: UpdateBenchmarkGoalPayload) => {
+      await updateBenchmarkGoal(payload);
+      const updatedBenchmark = await getCreatorBenchmark({
+        goal: payload.goalId,
+      });
+      return updatedBenchmark;
+    },
+    onSuccess: async (updatedBenchmark) => {
+      useAnalyticsStore.getState().saveBenchmark(updatedBenchmark);
+      queryClient.setQueryData(
+        queryKeys.benchmarks.creator(),
+        updatedBenchmark,
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.benchmarks.goals(),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.benchmarks.growthPlan(),
+        }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.insights.all }),
+      ]);
+    },
+  });
+}
+
+export function useDiscoverBenchmarkPeersMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload?: { goalId?: BenchmarkGoalId }) =>
+      discoverBenchmarkPeers(payload),
+    onSuccess: async (updatedBenchmark) => {
+      useAnalyticsStore.getState().saveBenchmark(updatedBenchmark);
+      queryClient.setQueryData(
+        queryKeys.benchmarks.creator(),
+        updatedBenchmark,
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.benchmarks.goals(),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.benchmarks.growthPlan(),
+        }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.insights.all }),
       ]);
     },
   });

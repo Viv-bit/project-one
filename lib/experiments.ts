@@ -2,7 +2,11 @@ import { apiFetch, experimentsUrl } from "./api";
 
 export type ExperimentCategory =
   | "TOPIC"
+  | "TOPICS"
   | "HOOK"
+  | "HOOKS"
+  | "PILLARS"
+  | "PACKAGING"
   | "FORMAT"
   | "CADENCE"
   | "DURATION";

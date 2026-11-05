@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { BenchmarksView } from "@/components/benchmarks/benchmarks-view";
 
 export const metadata: Metadata = {
-  title: "Peer Benchmarks · Tech & Studio Craft Cohort",
+  title: "Peer Benchmarks & Growth Plan",
   description:
-    "Intelligent peer comparison against 18 comparable creators. Percentile distributions for 0-3s hook hold, view velocity, and sustained retention.",
+    "Goal-driven peer benchmarking against comparable YouTube creators, comparative content distributions, and actionable peer growth plans.",
 };
 
 export default function BenchmarksPage() {

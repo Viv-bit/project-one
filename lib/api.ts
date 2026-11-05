@@ -22,6 +22,9 @@ export const insightsUrl = `${apiUrl}/api/insights`;
 export const recommendationsUrl = `${apiUrl}/api/recommendations`;
 export const experimentsUrl = `${apiUrl}/api/experiments`;
 export const benchmarksUrl = `${apiUrl}/api/benchmarks`;
+export const benchmarksGoalsUrl = `${apiUrl}/api/benchmarks/goals`;
+export const benchmarksDiscoverUrl = `${apiUrl}/api/benchmarks/discover`;
+export const benchmarksGrowthPlanUrl = `${apiUrl}/api/benchmarks/growth-plan`;
 
 export type AuthUser = {
   id: string;

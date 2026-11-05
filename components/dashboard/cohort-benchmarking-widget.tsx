@@ -94,7 +94,8 @@ export function CohortBenchmarkingWidget() {
   }
 
   // Connected state with real benchmark comparison
-  const { benchmarkGroup, comparativeMetrics } = benchmarkData;
+  const { benchmarkGroup, selectedGoal, comparativeMetrics } = benchmarkData;
+  const isLivePeers = benchmarkGroup?.source === "YOUTUBE_LIVE";
   const metrics = [
     comparativeMetrics?.medianViews,
     comparativeMetrics?.engagementRate,
@@ -115,11 +116,25 @@ export function CohortBenchmarkingWidget() {
           href="/dashboard/benchmarks"
           className="rounded-full bg-[#f6f2ea] border border-[#e8e2d8] px-2 py-0.5 text-[10px] font-semibold text-brand hover:underline"
         >
-          {benchmarkGroup?.sampleCreatorCount ?? 18} Peers &rarr;
+          {benchmarkGroup?.sampleCreatorCount ?? benchmarkData.peerCreators?.length ?? 18} Peers &rarr;
         </Link>
       </div>
 
-      <p className="mt-2.5 text-xs text-[#786f65] leading-relaxed">
+      {selectedGoal && (
+        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+          <span className="rounded-full bg-brand/10 border border-brand/20 px-2 py-0.5 text-[10px] font-semibold text-brand">
+            Goal: {selectedGoal.shortLabel || selectedGoal.title}
+          </span>
+          {isLivePeers && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
+              <span className="size-1.5 rounded-full bg-emerald-500" />
+              <span>Live YouTube Peers</span>
+            </span>
+          )}
+        </div>
+      )}
+
+      <p className="mt-2 text-xs text-[#786f65] leading-relaxed">
         Compared against verified creators in the <strong>{benchmarkGroup?.name ?? "peer cohort"}</strong>.
       </p>
 
