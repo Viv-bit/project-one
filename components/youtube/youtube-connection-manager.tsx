@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { useYouTubeConnection } from "@/lib/youtube-connection-context";
+import {
+  DEFAULT_YOUTUBE_RECONNECT_MESSAGE,
+  YOUTUBE_RECONNECT_REQUIRED_CODE,
+} from "@/lib/youtube";
 import { useAnalyticsStore } from "@/lib/store/analytics-store";
 import { YouTubeConnectCard } from "./youtube-connect-card";
 import { YouTubeConnectedCard } from "./youtube-connected-card";
@@ -11,10 +15,12 @@ import { Icon } from "@/components/ui/icon";
 
 type YouTubeConnectionManagerProps = {
   initialError?: string;
+  initialMessage?: string;
 };
 
 export function YouTubeConnectionManager({
   initialError,
+  initialMessage,
 }: YouTubeConnectionManagerProps) {
   const {
     connectionState,
@@ -24,18 +30,34 @@ export function YouTubeConnectionManager({
     triggerAutoSync,
   } = useYouTubeConnection();
 
+  const youtubeReconnectMessage = useAnalyticsStore(
+    (s) => s.youtubeReconnectMessage,
+  );
+  const clearYouTubeReconnectError = useAnalyticsStore(
+    (s) => s.clearYouTubeReconnectError,
+  );
+
   const [dismissedUrlError, setDismissedUrlError] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const errorMessage = !dismissedUrlError
-    ? initialError === "youtube"
-      ? "YouTube account connection was not completed. Google consent was cancelled or an error occurred during authorization."
-      : initialError
-        ? `Connection notice: ${initialError}. Please try connecting again.`
-        : connectionError === "UNAUTHORIZED"
-          ? "Your creator session could not be verified. Please ensure you are logged in."
-          : null
+  const isReconnectUrlError = initialError === YOUTUBE_RECONNECT_REQUIRED_CODE;
+
+  const urlErrorMessage = !dismissedUrlError
+    ? isReconnectUrlError
+      ? initialMessage || DEFAULT_YOUTUBE_RECONNECT_MESSAGE
+      : initialError === "youtube"
+        ? "YouTube account connection was not completed. Google consent was cancelled or an error occurred during authorization."
+        : initialError
+          ? `Connection notice: ${initialError}. Please try connecting again.`
+          : connectionError === "UNAUTHORIZED"
+            ? "Your creator session could not be verified. Please ensure you are logged in."
+            : null
     : null;
+
+  const errorMessage = youtubeReconnectMessage ?? urlErrorMessage;
+  const isReconnectRequired = Boolean(
+    youtubeReconnectMessage || (!dismissedUrlError && isReconnectUrlError),
+  );
 
   const handleDisconnected = () => {
     useAnalyticsStore.getState().clearActiveChannelAnalytics();
@@ -44,11 +66,13 @@ export function YouTubeConnectionManager({
   };
 
   const handleDismissError = () => {
+    clearYouTubeReconnectError();
     setDismissedUrlError(true);
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
-      if (url.searchParams.has("error")) {
+      if (url.searchParams.has("error") || url.searchParams.has("message")) {
         url.searchParams.delete("error");
+        url.searchParams.delete("message");
         window.history.replaceState({}, "", url.pathname + url.search);
       }
     }
@@ -79,6 +103,14 @@ export function YouTubeConnectionManager({
       {/* Error banner from URL parameter or fetch error */}
       {errorMessage && (
         <YouTubeErrorBanner
+          title={
+            isReconnectRequired
+              ? "YouTube Reconnection Required"
+              : "YouTube Connection Failed"
+          }
+          actionLabel={
+            isReconnectRequired ? "Reconnect YouTube Account" : "Try Again"
+          }
           message={errorMessage}
           onDismiss={handleDismissError}
         />
@@ -90,10 +122,13 @@ export function YouTubeConnectionManager({
       ) : connectionState?.connected ? (
         <YouTubeConnectedCard
           channel={connectionState.channel}
+          reconnectRequired={isReconnectRequired}
           onRefresh={async () => {
             await refreshConnection();
-            await triggerAutoSync({ force: true });
-            showToast("Channel metrics, medians, and AI analysis updated.");
+            const synced = await triggerAutoSync({ force: true });
+            if (synced) {
+              showToast("Channel metrics, medians, and AI analysis updated.");
+            }
           }}
           onDisconnected={handleDisconnected}
         />

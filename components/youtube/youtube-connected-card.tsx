@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { type YouTubeChannel } from "@/lib/api";
-import { formatCount } from "@/lib/youtube";
+import { formatCount, startYouTubeOAuth } from "@/lib/youtube";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Badge } from "@/components/ui/badge";
@@ -10,12 +10,14 @@ import { YouTubeDisconnectModal } from "./youtube-disconnect-modal";
 
 type YouTubeConnectedCardProps = {
   channel: YouTubeChannel;
+  reconnectRequired?: boolean;
   onRefresh: () => Promise<void>;
   onDisconnected: () => void;
 };
 
 export function YouTubeConnectedCard({
   channel,
+  reconnectRequired = false,
   onRefresh,
   onDisconnected,
 }: YouTubeConnectedCardProps) {
@@ -56,14 +58,36 @@ export function YouTubeConnectedCard({
           {/* Top banner: Status & Sync Actions */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line/80 pb-5">
             <div className="flex items-center gap-2">
-              <span className="flex size-2.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-xs font-semibold tracking-wide uppercase text-emerald-700">
-                Connected & Active
+              <span
+                className={`flex size-2.5 rounded-full ${
+                  reconnectRequired
+                    ? "bg-amber-500 animate-pulse"
+                    : "bg-emerald-500 animate-pulse"
+                }`}
+              />
+              <span
+                className={`text-xs font-semibold tracking-wide uppercase ${
+                  reconnectRequired ? "text-amber-700" : "text-emerald-700"
+                }`}
+              >
+                {reconnectRequired
+                  ? "Authorization Renewal Needed"
+                  : "Connected & Active"}
               </span>
               <span className="text-xs text-muted">· Read-only sync</span>
             </div>
 
             <div className="flex items-center gap-2">
+              {reconnectRequired && (
+                <Button
+                  size="sm"
+                  onClick={() => startYouTubeOAuth()}
+                  leadingIcon={<Icon name="youtube" className="size-3.5" />}
+                  className="bg-red-600 text-white hover:bg-red-700 text-xs h-8 px-3"
+                >
+                  Reconnect YouTube
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
@@ -215,15 +239,30 @@ export function YouTubeConnectedCard({
             <div className="col-span-2 sm:col-span-1 rounded-2xl border border-line bg-white/80 p-4 backdrop-blur-sm shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
               <div className="flex items-center justify-between text-muted">
                 <span className="text-xs font-medium">Lumen Intelligence</span>
-                <span className="flex size-6 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
-                  <Icon name="zap" className="size-3.5" />
+                <span
+                  className={`flex size-6 items-center justify-center rounded-lg ${
+                    reconnectRequired
+                      ? "bg-amber-100 text-amber-700"
+                      : "bg-emerald-100 text-emerald-700"
+                  }`}
+                >
+                  <Icon
+                    name={reconnectRequired ? "alert-triangle" : "zap"}
+                    className="size-3.5"
+                  />
                 </span>
               </div>
-              <p className="mt-2 text-base sm:text-lg font-semibold tracking-tight text-emerald-700">
-                Ready for Analysis
+              <p
+                className={`mt-2 text-base sm:text-lg font-semibold tracking-tight ${
+                  reconnectRequired ? "text-amber-700" : "text-emerald-700"
+                }`}
+              >
+                {reconnectRequired ? "Reconnect Required" : "Ready for Analysis"}
               </p>
               <p className="mt-0.5 text-[11px] text-muted">
-                Hook drop-offs & retention active
+                {reconnectRequired
+                  ? "Renew YouTube OAuth to resume sync"
+                  : "Hook drop-offs & retention active"}
               </p>
             </div>
           </div>

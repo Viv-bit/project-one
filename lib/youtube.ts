@@ -5,8 +5,20 @@ import {
   youtubeSyncUrl,
   youtubeAnalyzeUrl,
   youtubeVideosUrl,
+  YOUTUBE_RECONNECT_REQUIRED_CODE,
+  DEFAULT_YOUTUBE_RECONNECT_MESSAGE,
+  YouTubeReconnectRequiredError,
+  isYouTubeReconnectError,
   type YouTubeConnectionState,
 } from "./api";
+import { useAnalyticsStore } from "./store/analytics-store";
+
+export {
+  YOUTUBE_RECONNECT_REQUIRED_CODE,
+  DEFAULT_YOUTUBE_RECONNECT_MESSAGE,
+  YouTubeReconnectRequiredError,
+  isYouTubeReconnectError,
+};
 
 export type YouTubeVideoFeatures = {
   id?: string;
@@ -150,9 +162,15 @@ export async function syncYouTubeVideos(
   if (!response.ok) {
     if (response.status === 401) throw new Error("UNAUTHORIZED");
     const err = await response.json().catch(() => null);
+    if (err?.code === YOUTUBE_RECONNECT_REQUIRED_CODE) {
+      const msg = err?.message ?? DEFAULT_YOUTUBE_RECONNECT_MESSAGE;
+      useAnalyticsStore.getState().setYouTubeReconnectError(msg);
+      throw new YouTubeReconnectRequiredError(msg);
+    }
     throw new Error(err?.message ?? `Failed to sync YouTube videos (${response.status})`);
   }
 
+  useAnalyticsStore.getState().clearYouTubeReconnectError();
   return (await response.json()) as SyncYouTubeResult;
 }
 

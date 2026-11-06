@@ -78,12 +78,19 @@ const noopStorage: StateStorage = {
 
 export type AutoSyncStage = "idle" | "checking" | "syncing" | "analyzing";
 
+export type YouTubeReconnectToast = {
+  id: number;
+  message: string;
+};
+
 export type AnalyticsStoreState = {
   hasHydrated: boolean;
   currentUser: AuthUser | null;
   analyticsByUser: Record<string, CachedUserAnalytics>;
   autoSyncStage: AutoSyncStage;
   syncVersion: number;
+  youtubeReconnectMessage: string | null;
+  youtubeReconnectToast: YouTubeReconnectToast | null;
 
   // Lifecycle & Auth actions
   setHasHydrated: (hydrated: boolean) => void;
@@ -91,6 +98,9 @@ export type AnalyticsStoreState = {
   clearSession: () => void;
   setAutoSyncStage: (stage: AutoSyncStage) => void;
   incrementSyncVersion: () => void;
+  setYouTubeReconnectError: (message: string) => void;
+  dismissYouTubeReconnectToast: () => void;
+  clearYouTubeReconnectError: () => void;
 
   // Analytics persistence actions
   saveConnection: (connection: YouTubeConnectionState) => void;
@@ -117,11 +127,24 @@ export const useAnalyticsStore = create<AnalyticsStoreState>()(
       analyticsByUser: {},
       autoSyncStage: "idle",
       syncVersion: 0,
+      youtubeReconnectMessage: null,
+      youtubeReconnectToast: null,
 
       setHasHydrated: (hydrated) => set({ hasHydrated: hydrated }),
       setAutoSyncStage: (stage) => set({ autoSyncStage: stage }),
       incrementSyncVersion: () =>
         set((state) => ({ syncVersion: state.syncVersion + 1 })),
+      setYouTubeReconnectError: (message) =>
+        set((state) => ({
+          youtubeReconnectMessage: message,
+          youtubeReconnectToast: {
+            id: (state.youtubeReconnectToast?.id ?? 0) + 1,
+            message,
+          },
+        })),
+      dismissYouTubeReconnectToast: () => set({ youtubeReconnectToast: null }),
+      clearYouTubeReconnectError: () =>
+        set({ youtubeReconnectMessage: null, youtubeReconnectToast: null }),
 
       setAuthenticatedUser: (user) =>
         set((state) => {
@@ -174,6 +197,8 @@ export const useAnalyticsStore = create<AnalyticsStoreState>()(
           return {
             currentUser: null,
             analyticsByUser: nextMap,
+            youtubeReconnectMessage: null,
+            youtubeReconnectToast: null,
           };
         }),
 
@@ -286,6 +311,8 @@ export const useAnalyticsStore = create<AnalyticsStoreState>()(
         set((state) => {
           const key = resolveBucketKey(state.currentUser);
           return {
+            youtubeReconnectMessage: null,
+            youtubeReconnectToast: null,
             analyticsByUser: {
               ...state.analyticsByUser,
               [key]: {

@@ -3,7 +3,11 @@
 import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
-import { formatCount } from "@/lib/youtube";
+import {
+  formatCount,
+  isYouTubeReconnectError,
+  startYouTubeOAuth,
+} from "@/lib/youtube";
 import {
   useYouTubeVideosQuery,
   useSyncYouTubeMutation,
@@ -26,6 +30,7 @@ export function YouTubeVideoIngestPanel() {
   const [notification, setNotification] = useState<{
     type: "success" | "error" | "info";
     message: string;
+    reconnectRequired?: boolean;
   } | null>(null);
 
   const isSyncing = syncMutation.isPending || autoSyncStage === "syncing";
@@ -51,6 +56,7 @@ export function YouTubeVideoIngestPanel() {
       const msg = err instanceof Error ? err.message : "Sync failed";
       setNotification({
         type: "error",
+        reconnectRequired: isYouTubeReconnectError(err),
         message:
           msg === "UNAUTHORIZED"
             ? "Please sign in to sync YouTube videos."
@@ -79,6 +85,7 @@ export function YouTubeVideoIngestPanel() {
       const msg = err instanceof Error ? err.message : "Analysis failed";
       setNotification({
         type: "error",
+        reconnectRequired: isYouTubeReconnectError(err),
         message:
           msg === "UNAUTHORIZED"
             ? "Please sign in to analyze videos."
@@ -195,7 +202,7 @@ export function YouTubeVideoIngestPanel() {
               : "bg-brand/10 text-brand-strong border border-brand/20"
           }`}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5">
             <Icon
               name={
                 notification.type === "success"
@@ -207,6 +214,16 @@ export function YouTubeVideoIngestPanel() {
               className="size-4 shrink-0"
             />
             <span>{notification.message}</span>
+            {notification.reconnectRequired && (
+              <Button
+                size="sm"
+                onClick={() => startYouTubeOAuth()}
+                leadingIcon={<Icon name="youtube" className="size-3.5" />}
+                className="h-7 bg-red-600 px-2.5 text-[11px] text-white hover:bg-red-700"
+              >
+                Reconnect YouTube
+              </Button>
+            )}
           </div>
           <button
             onClick={() => setNotification(null)}

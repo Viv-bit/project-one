@@ -5,11 +5,15 @@ import { Button } from "@/components/ui/button";
 import { startYouTubeOAuth } from "@/lib/youtube";
 
 type YouTubeErrorBannerProps = {
+  title?: string;
+  actionLabel?: string;
   message?: string;
   onDismiss?: () => void;
 };
 
 export function YouTubeErrorBanner({
+  title = "YouTube Connection Failed",
+  actionLabel = "Try Again",
   message = "Failed to connect YouTube account. Google authorization was cancelled or your session expired.",
   onDismiss,
 }: YouTubeErrorBannerProps) {
@@ -24,7 +28,7 @@ export function YouTubeErrorBanner({
         </div>
         <div className="flex-1 pr-6">
           <h4 className="text-sm font-semibold text-red-900">
-            YouTube Connection Failed
+            {title}
           </h4>
           <p className="mt-1 text-xs sm:text-sm text-red-700 leading-relaxed">
             {message}
@@ -36,7 +40,7 @@ export function YouTubeErrorBanner({
               leadingIcon={<Icon name="youtube" />}
               className="bg-red-600 text-white hover:bg-red-700 text-xs h-8"
             >
-              Try Again
+              {actionLabel}
             </Button>
             {onDismiss && (
               <button

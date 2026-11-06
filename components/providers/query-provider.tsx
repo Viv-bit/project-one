@@ -8,7 +8,9 @@ import {
 } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { hydrateQueryClientFromStore } from "@/lib/queries";
+import { isYouTubeReconnectError } from "@/lib/api";
 import { useAnalyticsStore } from "@/lib/store/analytics-store";
+import { YouTubeReconnectHandler } from "@/components/youtube/youtube-reconnect-handler";
 
 function makeQueryClient() {
   return new QueryClient({
@@ -18,9 +20,12 @@ function makeQueryClient() {
         staleTime: 60 * 1000,
         // Automatically refetch when user refocuses window
         refetchOnWindowFocus: true,
-        // Retry failed queries once unless it's an unauthenticated error
+        // Retry failed queries once unless it's an unauthenticated or YouTube reconnect error
         retry: (failureCount, error) => {
-          if (error instanceof Error && error.message === "UNAUTHORIZED") {
+          if (
+            (error instanceof Error && error.message === "UNAUTHORIZED") ||
+            isYouTubeReconnectError(error)
+          ) {
             return false;
           }
           return failureCount < 1;
@@ -91,6 +96,7 @@ export function QueryProvider({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
+      <YouTubeReconnectHandler />
     </QueryClientProvider>
   );
 }

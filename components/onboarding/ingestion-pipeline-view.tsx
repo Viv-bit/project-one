@@ -10,6 +10,7 @@ import {
   getYouTubeVideos,
   syncYouTubeVideos,
   formatCount,
+  isYouTubeReconnectError,
   type YouTubeVideoItem,
 } from "@/lib/youtube";
 
@@ -222,7 +223,9 @@ export function IngestionPipelineView() {
       const errMsg = err instanceof Error ? err.message : "Ingestion sync failed";
       setFeedback({
         type: "error",
-        message: `Pipeline sync failed: ${errMsg}. Please try again or check YouTube permissions.`,
+        message: isYouTubeReconnectError(err)
+          ? err.message
+          : `Pipeline sync failed: ${errMsg}. Please try again or check YouTube permissions.`,
       });
     } finally {
       setIsSyncing(false);

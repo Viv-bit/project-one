@@ -18,6 +18,8 @@ import {
   syncYouTubeVideos,
   analyzeYouTubeVideos,
   startYouTubeOAuth,
+  YOUTUBE_RECONNECT_REQUIRED_CODE,
+  isYouTubeReconnectError,
 } from "./youtube";
 import {
   getCreatorProfile,
@@ -56,7 +58,7 @@ type YouTubeConnectionContextValue = {
   isAutoSyncing: boolean;
   autoSyncStage: AutoSyncStage;
   syncVersion: number;
-  triggerAutoSync: (options?: { force?: boolean }) => Promise<void>;
+  triggerAutoSync: (options?: { force?: boolean }) => Promise<boolean>;
 };
 
 const YouTubeConnectionContext = createContext<
@@ -74,6 +76,9 @@ export function YouTubeConnectionProvider({
   const currentUserId = useAnalyticsStore((s) => s.currentUser?.id ?? null);
   const autoSyncStage = useAnalyticsStore((s) => s.autoSyncStage);
   const syncVersion = useAnalyticsStore((s) => s.syncVersion);
+  const youtubeReconnectMessage = useAnalyticsStore(
+    (s) => s.youtubeReconnectMessage,
+  );
   const cachedConnection = useAnalyticsStore(
     (s) => selectLoggedInAnalytics(s)?.connection ?? null,
   );
@@ -141,9 +146,9 @@ export function YouTubeConnectionProvider({
    * runs Gemini AI feature classification when needed, and persists basic analytics to localStorage.
    */
   const runAutoSyncPipeline = useCallback(
-    async (options?: { force?: boolean }) => {
-      if (syncInFlightRef.current) return;
-      if (isDemoMode || !realConnected || !realChannelId) return;
+    async (options?: { force?: boolean }): Promise<boolean> => {
+      if (syncInFlightRef.current) return false;
+      if (isDemoMode || !realConnected || !realChannelId) return false;
 
       syncInFlightRef.current = true;
       const storeActions = useAnalyticsStore.getState();
@@ -162,8 +167,14 @@ export function YouTubeConnectionProvider({
         }
 
         const [existingVideos, existingOverview] = await Promise.all([
-          getYouTubeVideos().catch(() => []),
-          getCreatorOverview().catch(() => null),
+          getYouTubeVideos().catch((err) => {
+            if (isYouTubeReconnectError(err)) throw err;
+            return [];
+          }),
+          getCreatorOverview().catch((err) => {
+            if (isYouTubeReconnectError(err)) throw err;
+            return null;
+          }),
         ]);
 
         let latestVideos = Array.isArray(existingVideos) ? existingVideos : [];
@@ -221,6 +232,9 @@ export function YouTubeConnectionProvider({
               );
             }
           } catch (syncErr) {
+            if (isYouTubeReconnectError(syncErr)) {
+              return false;
+            }
             console.warn("Automatic YouTube video sync failed:", syncErr);
           }
         }
@@ -240,6 +254,9 @@ export function YouTubeConnectionProvider({
             didMutate = true;
             useAnalyticsStore.getState().markAnalyzed();
           } catch (analyzeErr) {
+            if (isYouTubeReconnectError(analyzeErr)) {
+              return false;
+            }
             console.warn("Automatic Gemini video analysis failed:", analyzeErr);
           }
         }
@@ -328,8 +345,13 @@ export function YouTubeConnectionProvider({
             useAnalyticsStore.getState().incrementSyncVersion();
           }
         }
+
+        return true;
       } catch (err) {
-        console.warn("Automatic sync & analysis pipeline error:", err);
+        if (!isYouTubeReconnectError(err)) {
+          console.warn("Automatic sync & analysis pipeline error:", err);
+        }
+        return false;
       } finally {
         syncInFlightRef.current = false;
         useAnalyticsStore.getState().setAutoSyncStage("idle");
@@ -340,7 +362,21 @@ export function YouTubeConnectionProvider({
 
   // Automatically trigger sync + analysis once Zustand store has hydrated and a real channel is connected
   useEffect(() => {
-    if (!hasHydrated || isDemoMode || !realConnected || !realChannelId) {
+    if (
+      !hasHydrated ||
+      isDemoMode ||
+      !realConnected ||
+      !realChannelId ||
+      Boolean(youtubeReconnectMessage)
+    ) {
+      return;
+    }
+
+    if (
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("error") ===
+        YOUTUBE_RECONNECT_REQUIRED_CODE
+    ) {
       return;
     }
 
@@ -357,6 +393,7 @@ export function YouTubeConnectionProvider({
     realConnected,
     realChannelId,
     currentUserId,
+    youtubeReconnectMessage,
     runAutoSyncPipeline,
   ]);
 

@@ -16,6 +16,9 @@ type YouTubePageProps = {
 export default async function YouTubePage({ searchParams }: YouTubePageProps) {
   const params = await searchParams;
   const error = Array.isArray(params.error) ? params.error[0] : params.error;
+  const message = Array.isArray(params.message)
+    ? params.message[0]
+    : params.message;
 
   return (
     <div className="max-w-5xl space-y-8 pb-16">
@@ -47,7 +50,10 @@ export default async function YouTubePage({ searchParams }: YouTubePageProps) {
 
         {/* Connection Manager Card */}
         <div className="mb-8">
-          <YouTubeConnectionManager initialError={error} />
+          <YouTubeConnectionManager
+            initialError={error}
+            initialMessage={message}
+          />
         </div>
 
         {/* Video Ingest & Gemini AI Classification Panel */}

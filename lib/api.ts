@@ -62,6 +62,31 @@ export type YouTubeConnectionState =
       channel?: never;
     };
 
+export const YOUTUBE_RECONNECT_REQUIRED_CODE = "YOUTUBE_RECONNECT_REQUIRED";
+export const DEFAULT_YOUTUBE_RECONNECT_MESSAGE =
+  "YouTube authorization needs renewal. Please reconnect your YouTube account.";
+
+export class YouTubeReconnectRequiredError extends Error {
+  readonly code = YOUTUBE_RECONNECT_REQUIRED_CODE;
+
+  constructor(message: string = DEFAULT_YOUTUBE_RECONNECT_MESSAGE) {
+    super(message);
+    this.name = "YouTubeReconnectRequiredError";
+  }
+}
+
+export function isYouTubeReconnectError(
+  err: unknown,
+): err is YouTubeReconnectRequiredError {
+  return (
+    err instanceof YouTubeReconnectRequiredError ||
+    (typeof err === "object" &&
+      err !== null &&
+      "code" in err &&
+      (err as { code?: unknown }).code === YOUTUBE_RECONNECT_REQUIRED_CODE)
+  );
+}
+
 let logoutPromise: Promise<void> | null = null;
 
 /**
@@ -128,6 +153,37 @@ export async function logoutUser(redirectToSignIn = true): Promise<void> {
 }
 
 /**
+ * Check whether a failed response requires renewing YouTube OAuth authorization.
+ */
+async function parseYouTubeReconnectError(
+  response: Response,
+): Promise<string | null> {
+  if (response.ok) {
+    return null;
+  }
+
+  if (
+    response.status === 400 ||
+    response.status === 401 ||
+    response.status === 403
+  ) {
+    try {
+      const cloned = response.clone();
+      const data = await cloned.json();
+      if (data?.code === YOUTUBE_RECONNECT_REQUIRED_CODE) {
+        return typeof data?.message === "string" && data.message.trim().length > 0
+          ? data.message
+          : DEFAULT_YOUTUBE_RECONNECT_MESSAGE;
+      }
+    } catch {
+      // Body not JSON or already consumed
+    }
+  }
+
+  return null;
+}
+
+/**
  * Check whether a response represents an authentication error.
  */
 async function isAuthenticationError(response: Response): Promise<boolean> {
@@ -139,6 +195,9 @@ async function isAuthenticationError(response: Response): Promise<boolean> {
     try {
       const cloned = response.clone();
       const data = await cloned.json();
+      if (data?.code === YOUTUBE_RECONNECT_REQUIRED_CODE) {
+        return false;
+      }
       const message = (data?.message || data?.error || "").toString().toLowerCase();
       if (
         message.includes("unauthorized") ||
@@ -162,7 +221,8 @@ async function isAuthenticationError(response: Response): Promise<boolean> {
 
 /**
  * Centralized fetch client for all endpoints.
- * Automatically handles credentials, JSON accept headers, and triggers logout/redirect on 401/auth errors.
+ * Automatically handles credentials, JSON accept headers, YouTube reconnect renewal,
+ * and triggers logout/redirect on 401/auth errors.
  */
 export async function apiFetch(
   input: RequestInfo | URL,
@@ -178,6 +238,12 @@ export async function apiFetch(
     ...init,
     headers,
   });
+
+  const reconnectMessage = await parseYouTubeReconnectError(response);
+  if (reconnectMessage) {
+    useAnalyticsStore.getState().setYouTubeReconnectError(reconnectMessage);
+    throw new YouTubeReconnectRequiredError(reconnectMessage);
+  }
 
   const urlStr =
     typeof input === "string"
